@@ -156,6 +156,11 @@ label.ck input{width:auto}
   .rate{grid-template-columns:repeat(5,minmax(0,1fr))}
 }
 .bga{background:var(--amber)}
+.tb{display:flex;gap:6px;flex:none}
+a.btn{display:inline-block;border:1px solid var(--line2);padding:7px 10px;font-size:12px;letter-spacing:.06em;color:var(--tx);text-decoration:none}
+a.btn:hover{border-color:var(--amber);color:var(--amber)}
+a.btn.sm{padding:2px 7px;font-size:11px}
+.tag{align-self:center;border:1px solid var(--amber);color:var(--amber);font-size:10px;padding:1px 5px;letter-spacing:.06em}
 .ca .ln{stroke:var(--amber)}.ca .ar{fill:rgba(255,176,0,.1)}
 .hl{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);margin-top:4px}
 .trow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
@@ -198,22 +203,46 @@ fieldset>label{margin-bottom:10px}
 const KEY='isx.rewire.v1', RUN='isx.rewire.run', PAGE=20, DAY=864e5;
 const RANGES={today:'Today',week:'This week',month:'This month',all:'All time'};
 const TRIG=['Boredom','Stress','Tired','Lonely','Anxious','Phone in hand','After a meal','Social','Celebrating','Work break','Late night','Other'];
-// suggested swaps for common habits; anything can be typed in instead
-const BAD={
-  'Doomscrolling':['Read 5 pages','Walk 10 min','Text a friend','Breathing reset'],
-  'Smoking':['Chew gum','Drink water','Walk 10 min','Breathing reset'],
-  'Vaping':['Chew gum','Drink water','Walk 10 min','Breathing reset'],
-  'Alcohol':['Sparkling water','Walk 10 min','Call a friend','Journal 5 min'],
-  'Junk food / sugar':['Drink water','Eat fruit','Walk 10 min','Brush teeth'],
-  'Late-night snacking':['Herbal tea','Brush teeth','Read 5 pages','Go to bed on time'],
-  'Procrastination':['Work 5 min (just start)','Write the next step','Tidy 5 min','Breathing reset'],
-  'Gaming too much':['Walk 10 min','Read 5 pages','Call a friend','Stretch 5 min'],
-  'Porn':['Cold shower','Walk 10 min','20 push-ups','Leave the room'],
-  'Gambling':['Call a friend','Walk 10 min','Journal 5 min','Check the budget'],
-  'Online shopping':['Wait 24 h list','Check the budget','Walk 10 min','Read 5 pages'],
-  'Nail biting':['Squeeze a stress ball','Wash hands','Chew gum','Breathing reset'],
-  'Caffeine':['Drink water','Herbal tea','Walk 10 min','Power nap 15 min']
+// the other ISIONXXX apps share this site, so their logs can be read here (read-only)
+const APPS={
+  MIND:{repo:'MEDITATE',key:'isx.mind.v1',rows:s=>s?.log,at:e=>e.at},
+  TRAINING:{repo:'TRAINING',key:'isx.training.v1',rows:s=>s?.log,at:e=>e.at},
+  FUEL:{repo:'nutrition',key:'nj.meals.v1',rows:s=>s,at:e=>Date.parse(e.time)},
+  EXTRACT:{repo:'data-analytics',key:'xl.sessions.v1',rows:s=>s,at:e=>Date.parse(e.time)},
+  JOURNAL:{repo:'JOURNAL',key:'isx.journal.v1',rows:s=>s?.trades,at:e=>e.close}
 };
+// good habits that tick themselves off when you log in another app; day:1 = counts once per day
+const LINKS={
+  meditate:{app:'MIND',name:'Meditate',f:e=>e.kind==='M'},
+  breathwork:{app:'MIND',name:'Breathwork',f:e=>e.kind==='B'},
+  mjournal:{app:'MIND',name:'Journal',f:e=>e.kind==='J'},
+  mind:{app:'MIND',name:'Mind session'},
+  workout:{app:'TRAINING',name:'Workout',f:e=>e.type!=='S',day:1},
+  stretch:{app:'TRAINING',name:'Stretch',f:e=>e.type==='S',day:1},
+  meals:{app:'FUEL',name:'Log meals'},
+  bowl:{app:'FUEL',name:'Eat the balanced bowl',f:e=>e.kind==='bowl'},
+  study:{app:'EXTRACT',name:'Study session'},
+  trades:{app:'JOURNAL',name:'Review trades',day:1}
+};
+// on GitHub Pages the apps sit side by side; anywhere else, point at the published copies
+const BASE=/github\.io$/.test(location.hostname)?location.origin+'/':'https://giovanij933.github.io/';
+const appUrl=a=>BASE+APPS[a].repo+'/';
+function appRows(a){try{const r=APPS[a].rows(JSON.parse(localStorage.getItem(APPS[a].key)));return Array.isArray(r)?r:null}catch(e){return null}}
+// completions pulled from the other apps, shaped like 'done' entries
+function linked(){
+  const out=[],cache={};
+  S.good.forEach(g=>{
+    const L=LINKS[g.link];if(!L)return;
+    const rows=cache[L.app]??=appRows(L.app)||[],seen=new Set();
+    rows.filter(e=>!L.f||L.f(e)).forEach(e=>{
+      const at=APPS[L.app].at(e);if(!isFinite(at))return;
+      const day=ymd(new Date(at));if(L.day){if(seen.has(day))return;seen.add(day)}
+      out.push({id:'lk-'+g.link+'-'+at,at,t:'done',g:g.name,src:L.app,ro:1,note:''});
+    });
+  });
+  return out;
+}
+let LK=[];
 const GOOD=['Drink water','Walk 10 min','20 push-ups','Read 5 pages','Meditate 5 min','Journal 5 min','Stretch 5 min','Breathing reset',
   'Call a friend','Text a friend','Cold shower','Tidy 5 min','Eat fruit','Herbal tea','Sparkling water','Chew gum','Brush teeth',
   'Go to bed on time','Work 5 min (just start)','Leave the room'];
@@ -253,7 +282,7 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('
 function setMonth(ms){const d=new Date(ms);U.month={y:d.getFullYear(),m:d.getMonth()}}
 let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),3200)}
 const badOf=id=>S.bad.find(b=>b.id===id);
-const isDone=e=>e.t==='done'||(e.t==='resist'&&e.g);
+const isDone=e=>e.t==='done'||(e.t==='resist'&&e.g&&!e.lk);
 
 /* ---------- numbers ---------- */
 function inRange(day){
@@ -261,7 +290,7 @@ function inRange(day){
   return U.range==='all'||(U.range==='today'?day===today:U.range==='week'?wk(day)===wk(today):U.range==='month'?day.slice(0,7)===today.slice(0,7):day===U.range);
 }
 // the selected bad habit; good-habit check-offs always count (they belong to every habit)
-const view=(useRange=true)=>S.log.map(e=>({...e,day:ymd(new Date(e.at))}))
+const view=(useRange=true)=>[...S.log,...LK].map(e=>({...e,day:ymd(new Date(e.at))}))
   .filter(e=>(U.h==='all'||e.t==='done'||e.b===U.h)&&(!useRange||inRange(e.day))).sort((a,b)=>a.at-b.at);
 // clean streak = time since the last slip (or since you started); best = the longest gap between slips
 function streak(ids){
@@ -339,11 +368,13 @@ function calendar(){
 }
 
 function today(){
-  const t=ymd(new Date()),L=S.log.filter(e=>ymd(new Date(e.at))===t);
+  const t=ymd(new Date()),L=[...S.log,...LK].filter(e=>ymd(new Date(e.at))===t);
   const bad=S.bad.map(b=>{const st=streak([b.id]),u=L.filter(e=>e.b===b.id&&e.t!=='done');
     return `<div class="trow"><div><b>${esc(b.name)}</b><div class="dim">${span(st.cur)} clean · ${u.filter(e=>e.t==='resist').length} beaten today</div></div><button class="pri" data-a="urge" data-v="${b.id}">URGE</button></div>`}).join('');
   const good=S.good.map(g=>{const n=L.filter(e=>isDone(e)&&e.g===g.name).length,tg=g.target||1;
-    return `<div class="trow"><div><b class="${n>=tg?'pos':''}">${esc(g.name)}</b><div class="dim">${n} / ${tg} today${n>=tg?' ✓':''}</div></div><button data-a="done" data-v="${esc(g.name)}">+ DONE</button></div>`}).join('');
+    const lk=LINKS[g.link],none=lk&&!appRows(lk.app);
+    return `<div class="trow"><div><b class="${n>=tg?'pos':''}">${esc(g.name)}</b><div class="dim">${n} / ${tg} today${n>=tg?' ✓':''}${lk?` · <span class="amb">via ${lk.app}</span>${none?' (no data here yet)':''}`:''}</div></div>
+     <span class="tb">${lk?`<a class="btn" href="${appUrl(lk.app)}" target="_blank" rel="noopener">OPEN</a>`:''}<button data-a="done" data-v="${esc(g.name)}">+ DONE</button></span></div>`}).join('');
   return `<div class="card"><p class="h">Today</p>
    <div class="sec first">Breaking</div>${bad||'<p class="dim">No habit to break yet_</p>'}
    <div class="sec">Building</div>${good||'<p class="dim">No good habits yet_</p>'}
@@ -353,12 +384,12 @@ function today(){
 function table(T){
   const rows=[...T].reverse(),pages=Math.max(1,Math.ceil(rows.length/PAGE)),na='<span class="dim">—</span>';
   U.page=Math.min(Math.max(U.page,0),pages-1);
-  const what=e=>e.t==='done'?`<b class="pos">GOOD</b>`:e.t==='slip'?`<b class="neg">SLIP</b>`:`<b class="pos">BEAT URGE</b>`;
+  const what=e=>e.t==='done'?`<b class="pos">GOOD</b>${e.src?` <span class="dim">· ${e.src}</span>`:''}`:e.t==='slip'?`<b class="neg">SLIP</b>`:`<b class="pos">BEAT URGE</b>`;
   const body=rows.slice(U.page*PAGE,(U.page+1)*PAGE).map(e=>`<tr>
    <td>${tfmt(e.at)}</td><td>${what(e)}</td><td>${e.b?esc(badOf(e.b)?.name||'—'):na}</td><td>${e.g?esc(e.g):na}</td>
    <td class="r">${e.int??na}</td><td class="dim">${esc(e.trig)||'—'}</td>
    <td class="dim" title="${esc(e.note)}">${esc((e.note||'').length>40?e.note.slice(0,39)+'…':e.note||'')}</td>
-   <td class="r"><button data-a="edit" data-v="${e.id}">EDIT</button> <button data-a="del" data-v="${e.id}" aria-label="Delete entry">X</button></td></tr>`).join('');
+   <td class="r">${e.ro?`<a class="btn sm" href="${appUrl(e.src)}" target="_blank" rel="noopener">${e.src}</a>`:`<button data-a="edit" data-v="${e.id}">EDIT</button> <button data-a="del" data-v="${e.id}" aria-label="Delete entry">X</button>`}</td></tr>`).join('');
   return `<div class="card"><div class="rowh"><p class="h">Log</p><button data-a="csv">EXPORT CSV</button></div>
   <div class="tw"><table><thead><tr><th>Time (local)</th><th>Event</th><th>Breaking</th><th>Good habit</th><th class="r">Urge</th><th>Trigger</th><th>Note</th><th></th></tr></thead>
   <tbody>${body||'<tr><td colspan="8" class="dim">Nothing in this view_</td></tr>'}</tbody></table></div>
@@ -367,6 +398,7 @@ function table(T){
 
 function render(){
   if(U.h!=='all'&&!badOf(U.h))U.h='all';
+  LK=linked();
   const T=view(),s=stats(T),ids=U.h==='all'?S.bad.map(b=>b.id):[U.h],st=streak(ids),gf=st.goal?Math.min(1,st.cur/(st.goal*DAY)):0;
   const t=ymd(new Date()),tgt=S.good.reduce((a,g)=>a+(g.target||1),0),dn=S.log.filter(e=>isDone(e)&&ymd(new Date(e.at))===t).length;
   $('[data-f=h]').innerHTML='<option value="all">All habits</option>'+S.bad.map(b=>`<option value="${b.id}"${b.id===U.h?' selected':''}>${esc(b.name)}</option>`).join('');
@@ -377,9 +409,8 @@ function render(){
   const dk=s.dk,hoursMax=Math.max(...s.hours),danger=hoursMax?s.hours.indexOf(hoursMax):null;
   const hr=h=>h==null?'—':new Date(2000,0,1,h).toLocaleTimeString('en-US',{hour:'numeric'});
 
-  $('#app').innerHTML=`${S.bad.length?'':`<div class="card empty"><p class="h">What do you want to break?</p><p class="dim">Pick a habit to start, or load a sample month to see how it reads. You can rename it and choose its replacements next.</p>
-   <div class="chips">${Object.keys(BAD).map(n=>`<button data-a="pick" data-v="${esc(n)}">${esc(n)}</button>`).join('')}<button data-a="pick" data-v="">+ OTHER</button></div>
-   <button data-a="sample">LOAD SAMPLE</button></div>`}
+  $('#app').innerHTML=`${S.bad.length?'':`<div class="card empty"><p class="h">What do you want to break?</p><p class="dim">Name the habit, then choose the good habits that replace it. Good habits can link to MIND, TRAINING, FUEL, EXTRACT and JOURNAL and tick themselves off when you log there.</p>
+   <form id="ob" class="chips"><input name="n" required autocomplete="off" placeholder="The habit to break" aria-label="The habit to break" style="flex:1;min-width:200px;width:auto"><button class="pri">START</button><button type="button" data-a="sample">LOAD SAMPLE</button></form></div>`}
 <section class="g g4">
  <div class="card"><p class="h">Clean streak</p><div class="k">Since last slip</div><div class="big pos">${S.bad.length?span(st.cur):'—'}</div>
   ${gauge([[gf,'sg']],st.goal?Math.round(gf*100)+'%':'—')}
@@ -418,32 +449,31 @@ ${table(T)}
 /* ---------- habits setup ---------- */
 function habitsForm(pick){
   const B=S.bad.map(b=>({...b,reps:[...b.reps]})),G=S.good.map(g=>({...g}));
-  if(pick!=null){const reps=BAD[pick]||['Walk 10 min','Drink water','Breathing reset'];
-    B.push({id:uid(),name:pick,why:'',cost:'',unit:'$',goal:30,start:Date.now(),reps});
-    reps.forEach(r=>{if(!G.some(g=>g.name===r))G.push({name:r,target:1})})}
+  if(pick!=null)B.push({id:uid(),name:pick,why:'',cost:'',unit:'$',goal:30,start:Date.now(),reps:[]});
   if(!B.length)B.push({id:uid(),name:'',why:'',cost:'',unit:'$',goal:30,start:Date.now(),reps:[]});
   const draw=()=>{
     dlg.innerHTML=`<form id="hf"><h3>HABITS</h3>
     ${B.map((b,i)=>`<fieldset data-i="${i}"><legend>BREAK ${i+1}</legend>
      <div class="fgrid">
-      <label>Habit to break<input name="name" list="badl" required autocomplete="off" placeholder="Doomscrolling" value="${esc(b.name)}"></label>
+      <label>Habit to break<input name="name" required autocomplete="off" placeholder="Name it" value="${esc(b.name)}"></label>
       <label>Clean since<input name="start" type="date" value="${ymd(new Date(b.start))}"></label>
       <label>Cost per slip (optional)<span class="pair"><input name="cost" type="number" min="0" step="any" placeholder="0" value="${b.cost}"><select name="unit"><option value="$"${b.unit!=='min'?' selected':''}>$</option><option value="min"${b.unit==='min'?' selected':''}>min</option></select></span></label>
       <label>Streak goal (days)<input name="goal" type="number" min="1" step="1" value="${b.goal||30}"></label>
      </div>
      <label>Why you're quitting<input name="why" autocomplete="off" placeholder="More focus. Sleep better. Be present." value="${esc(b.why)}"></label>
-     <span class="k">Replace it with — tap to choose</span>
-     <div class="chips">${[...new Set([...b.reps,...(BAD[b.name]||[]),...G.map(g=>g.name)])].map(r=>`<button type="button" data-rep="${esc(r)}"${b.reps.includes(r)?' class="on"':''}>${esc(r)}</button>`).join('')}</div>
+     <span class="k">Replace it with — tap your good habits</span>
+     <div class="chips">${G.length?'':'<span class="dim">Add good habits below first_</span>'}${[...new Set([...b.reps,...G.map(g=>g.name)])].map(r=>`<button type="button" data-rep="${esc(r)}"${b.reps.includes(r)?' class="on"':''}>${esc(r)}</button>`).join('')}</div>
      ${B.length>1?`<button type="button" class="lnk" data-rm="${i}">Remove this habit</button>`:''}
     </fieldset>`).join('')}
     <button type="button" id="ab">+ ANOTHER HABIT TO BREAK</button>
     <fieldset><legend>BUILD</legend>
-     ${G.map((g,i)=>`<div class="grow" data-g="${i}"><input name="gn" value="${esc(g.name)}" aria-label="Good habit"><input name="gt" type="number" min="1" step="1" value="${g.target||1}" aria-label="Times per day" title="Times per day"><button type="button" data-gx="${i}" aria-label="Remove">X</button></div>`).join('')||'<p class="dim">No good habits yet_</p>'}
-     <span class="k">Add a good habit</span>
+     ${G.map((g,i)=>`<div class="grow" data-g="${i}"><input name="gn" value="${esc(g.name)}" aria-label="Good habit">${LINKS[g.link]?`<span class="tag">${LINKS[g.link].app}</span>`:''}<input name="gt" type="number" min="1" step="1" value="${g.target||1}" aria-label="Times per day" title="Times per day"><button type="button" data-gx="${i}" aria-label="Remove">X</button></div>`).join('')||'<p class="dim">No good habits yet_</p>'}
+     <span class="k">Linked to your apps — ticks itself off when you log there</span>
+     <div class="chips">${Object.entries(LINKS).filter(([k])=>!G.some(g=>g.link===k)).map(([k,l])=>`<button type="button" data-link="${k}">+ ${esc(l.name)} <span class="dim">· ${l.app}</span></button>`).join('')}</div>
+     <span class="k">Other good habits</span>
      <div class="chips">${GOOD.filter(n=>!G.some(g=>g.name===n)).map(n=>`<button type="button" data-add="${esc(n)}">+ ${esc(n)}</button>`).join('')}<input id="gnew" placeholder="Your own" aria-label="Your own good habit" style="width:150px"><button type="button" id="gadd">ADD</button></div>
      <p class="dim">The number next to each one is how many times a day you aim for.</p>
     </fieldset>
-    <datalist id="badl">${Object.keys(BAD).map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
     <div class="fa2"><span id="pv"></span><button type="button" data-a="x">CANCEL</button><button class="pri">SAVE</button></div></form>`;
     const f=$('#hf');
     // keep typed values when the form redraws
@@ -460,6 +490,7 @@ function habitsForm(pick){
       else if(t.dataset.rm!=null)B.splice(+t.dataset.rm,1);
       else if(t.dataset.gx!=null)G.splice(+t.dataset.gx,1);
       else if(t.dataset.add!=null)add(t.dataset.add);
+      else if(t.dataset.link!=null){const k=t.dataset.link;let n=LINKS[k].name;if(G.some(g=>g.name===n))n+=` (${LINKS[k].app})`;G.push({name:n,target:1,link:k})}
       else if(t.id==='gadd')add($('#gnew').value);
       else if(t.id==='ab')B.push({id:uid(),name:'',why:'',cost:'',unit:'$',goal:30,start:Date.now(),reps:[]});
       const y=dlg.scrollTop;draw();dlg.scrollTop=y;
@@ -572,14 +603,19 @@ function outcomeForm(){
    ${R.int==null?rpick('int','How strong was it? (1–10)'):''}
    ${R.trig?'':`<span class="k">What set it off?</span>${cpick('trig',TRIG)}`}
    <label>Note<textarea name="note" rows="3" placeholder="${R.slipped?'Where, when, what would help next time.':'What helped.'}"></textarea></label>
-   <div class="fa2"><button type="button" id="ox">DISCARD</button>${R.slipped?'':'<button type="button" id="os">ACTUALLY SLIPPED</button>'}<button class="pri">SAVE</button></div></form>`;
+   <div class="fa2"><button type="button" id="ox">DISCARD</button>${R.slipped?'':'<button type="button" id="os">ACTUALLY SLIPPED</button><button type="button" id="oo" hidden>SAVE &amp; OPEN</button>'}<button class="pri">SAVE</button></div></form>`;
   const f=$('#of');
   $('#ox').onclick=()=>{if(confirm('Discard this urge without logging it?')){clearRun();dlg.close()}};
   $('#os')&&($('#os').onclick=()=>{R.slipped=true;keepRun();draw()});
+  // the swap lives in another app: save, then go there
+  const lkOf=n=>LINKS[S.good.find(g=>g.name===n)?.link];
+  const oo=$('#oo'),syncO=()=>{if(!oo)return;const l=lkOf(cval('rep'));oo.hidden=!l;if(l)oo.textContent=`SAVE & OPEN ${l.app}`};
+  f.addEventListener('input',syncO);syncO();
+  oo&&(oo.onclick=()=>{const l=lkOf(cval('rep'));f.requestSubmit();if(l)window.open(appUrl(l.app),'_blank','noopener')});
   f.onsubmit=ev=>{
     ev.preventDefault();
     const e={id:uid(),at:R.t0,t:R.slipped?'slip':'resist',b:R.b,int:R.int??rval('int'),trig:R.trig??cval('trig'),note:f.elements.note.value.trim()};
-    if(!R.slipped){const g=cval('rep');if(g)e.g=g}
+    if(!R.slipped){const g=cval('rep');if(g)e.g=g;if(g&&LINKS[S.good.find(x=>x.name===g)?.link])e.lk=1}
     S.log.push(e);save();clearRun();dlg.close();setMonth(e.at);render();
     toast(e.t==='slip'?'Logged. Next urge, fresh start.':`Urge beaten${h?.cost?` · ${money(+h.cost,h.unit)} saved`:''}`);
   };
@@ -634,7 +670,7 @@ function sample(){
   // four weeks of quitting doomscrolling: urges get rarer and weaker, two early slips
   const now=new Date(),id=uid(),at=(ago,h,m)=>new Date(now.getFullYear(),now.getMonth(),now.getDate()-ago,h,m).getTime();
   S.bad=[{id,name:'Doomscrolling',why:'Sleep earlier and actually finish books.',cost:20,unit:'min',goal:30,start:at(27,8,0),reps:['Read 5 pages','Walk 10 min','Breathing reset']}];
-  S.good=[{name:'Read 5 pages',target:1},{name:'Walk 10 min',target:1},{name:'Breathing reset',target:2},{name:'Drink water',target:3}];
+  S.good=[{name:'Read 5 pages',target:1},{name:'Walk 10 min',target:1},{name:'Breathing reset',target:2},{name:'Drink water',target:3},{name:'Meditate',target:1,link:'meditate'},{name:'Workout',target:1,link:'workout'}];
   const T=['Boredom','Late night','Phone in hand','Work break','Tired','Stress'];
   for(let ago=27;ago>=0;ago--){
     const n=ago>18?4:ago>9?3:2;
@@ -664,6 +700,7 @@ const ACT={
 };
 function shift(k){const d=new Date(U.month.y,U.month.m+k,1);U.month={y:d.getFullYear(),m:d.getMonth()};render()}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b&&ACT[b.dataset.a])ACT[b.dataset.a](b.dataset.v)});
+document.addEventListener('submit',e=>{if(e.target.id!=='ob')return;e.preventDefault();habitsForm(e.target.elements.n.value.trim())});
 document.addEventListener('change',e=>{const k=e.target.dataset.f;if(!k)return;U[k]=e.target.value;U.page=0;render()});
 $('#file').addEventListener('change',async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
