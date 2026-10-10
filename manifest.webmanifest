@@ -1,0 +1,14 @@
+{
+  "name": "ISIONXXX // REWIRE",
+  "short_name": "REWIRE",
+  "description": "Break a bad habit and build the good ones that replace it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070707",
+  "theme_color": "#070707",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

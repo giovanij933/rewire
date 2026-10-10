@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070707">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="REWIRE">
+<title>ISIONXXX // REWIRE</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#070707;--panel:#0c0c0c;--line:#1c1c1c;--line2:#2c2c2c;
+  --tx:#d9d5c8;--dim:#78746a;--amber:#ffb000;--green:#33ff66;--red:#ff4545;
+  --f:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0 auto;max-width:1440px;padding:calc(env(safe-area-inset-top) + 14px) 16px 48px;background:var(--bg);color:var(--tx);font:13px/1.45 var(--f);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+p{margin:0}
+button,select,input,textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line2);border-radius:0;padding:7px 10px;outline:0}
+button{cursor:pointer;font-size:12px;letter-spacing:.06em}
+button:hover,select:hover{border-color:var(--amber);color:var(--amber)}
+:focus-visible{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
+.pri{background:var(--amber);border-color:var(--amber);color:#000;font-weight:600}
+.pri:hover{color:#000;filter:brightness(1.12)}
+.pos{color:var(--green)}.neg{color:var(--red)}.dim{color:var(--dim)}.amb{color:var(--amber)}
+.bgp{background:var(--green)}.bgn{background:var(--red)}.bgd{background:var(--line2)}
+.r{text-align:right}
+
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.brand{font-weight:600;font-size:15px;letter-spacing:.14em}
+.brand b{color:var(--amber)}
+.cur{display:inline-block;width:.6em;height:1.05em;margin-left:6px;background:var(--amber);vertical-align:-2px;animation:bl 1.1s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.cur{animation:none}}
+.acts,.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bar{padding:14px 0}
+
+.g{display:grid;gap:12px;margin-bottom:12px}
+.g4{grid-template-columns:repeat(4,1fr)}.g21{grid-template-columns:2fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+.card{background:var(--panel);border:1px solid var(--line);padding:16px;min-width:0}
+.card.gap{margin-bottom:12px}
+.h{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);margin-bottom:12px}
+.h::before{content:'> ';color:var(--dim)}
+.k{font-size:11px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase}
+.big{font-size:22px;font-weight:600;margin:2px 0 8px}
+.rowh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.empty{margin-bottom:12px;border-color:var(--amber)}
+.empty p+p{margin-bottom:12px}
+
+.gauge{display:block;width:150px;max-width:100%;margin:6px auto 10px}
+.gauge path{fill:none;stroke-width:9}
+.s0{stroke:var(--line2)}.sg{stroke:var(--green)}.sr{stroke:var(--red)}.sd{stroke:var(--dim)}
+.gauge text{fill:var(--tx);font:600 17px var(--f)}
+.lg{display:grid;grid-template-columns:14px 1fr auto 46px;align-items:center;padding:2px 0}
+.lg em{font-style:normal;color:var(--dim);text-align:right}
+.dot{display:inline-block;width:7px;height:7px}
+.ev{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0}
+.ev.rule{border-top:1px solid var(--line);margin-top:4px;padding-top:10px}
+.hb{height:20px;background:#111;margin:2px 0 10px}
+.hb i{display:block;height:100%}
+.sec{font-size:10px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;margin:12px 0 4px;padding-top:12px;border-top:1px solid var(--line)}
+.sec.first{border:0;margin-top:0;padding-top:0}
+
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr)) minmax(0,.9fr);gap:4px}
+.dw{font-size:11px;color:var(--dim);text-align:center;padding:4px 0;letter-spacing:.08em;text-transform:uppercase}
+.cd{min-height:66px;padding:6px;border:1px solid var(--line);background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:11px;letter-spacing:0;color:var(--dim);overflow:hidden}
+.cd b{font-size:12px}.cd em{font-style:normal;font-size:10px}
+.cd.we,.cd.off{background:repeating-linear-gradient(135deg,#0a0a0a 0 6px,#111 6px 7px)}
+.cd.off{border-color:transparent;opacity:.5}
+.cd.p{background:rgba(51,255,102,.07);border-color:rgba(51,255,102,.3)}
+.cd.n{background:rgba(255,69,69,.08);border-color:rgba(255,69,69,.3)}
+.cd.z{border-color:var(--line2)}
+.cd.now span{color:var(--amber)}
+.cd.sel{border-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber)}
+.cd.wk{border-style:dashed}
+.calf{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+.eqs{display:flex;gap:22px;flex-wrap:wrap}
+.eqs div{display:flex;flex-direction:column;gap:2px}
+.chart{display:block;width:100%;height:160px}
+.chart *{vector-effect:non-scaling-stroke}
+.chart .ln{fill:none;stroke-width:1.5}
+.chart .z{stroke:var(--line2);stroke-dasharray:4 4}
+.cg .ln{stroke:var(--green)}.cg .ar{fill:rgba(51,255,102,.1)}
+.cr .ln{stroke:var(--red)}.cr .ar{fill:rgba(255,69,69,.1)}
+.fp{fill:var(--green)}.fn{fill:var(--red)}.fa{fill:var(--amber)}
+.nd{height:160px;display:grid;place-items:center;color:var(--dim);letter-spacing:.14em;font-size:11px}
+.radar{display:block;width:100%;max-width:230px;margin:0 auto}
+.radar .rg{fill:none;stroke:var(--line2)}
+.radar .rv{fill:rgba(255,176,0,.16);stroke:var(--amber);stroke-width:1.5}
+.radar text{fill:var(--dim);font:10px var(--f);letter-spacing:.08em}
+
+.tw{overflow-x:auto}
+table{width:100%;min-width:980px;border-collapse:collapse}
+table.sm{min-width:560px}
+th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;font-weight:500;color:var(--dim);letter-spacing:.08em;text-transform:uppercase}
+th.r,td.r{text-align:right}
+td button{padding:2px 7px;font-size:11px}
+footer{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:16px;font-size:11px;color:var(--dim)}
+footer button{padding:3px 8px;font-size:11px}
+footer p{flex-basis:100%}
+
+dialog{background:var(--panel);color:var(--tx);border:1px solid var(--amber);padding:20px;width:min(560px,calc(100vw - 24px))}
+dialog::backdrop{background:rgba(0,0,0,.78)}
+dialog h3{margin:0 0 14px;font-size:13px;letter-spacing:.14em;color:var(--amber)}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.fgrid>button{align-self:end}
+label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase}
+label input,label select,label textarea,dialog textarea{width:100%;font-size:13px;letter-spacing:0;text-transform:none;color:var(--tx)}
+textarea{resize:vertical}
+.fa2{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:14px}
+.fa2>span{margin-right:auto}
+/* guided session */
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 12px}
+.chips input{width:84px}
+.rate{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;margin:4px 0 12px}
+.rate button{padding:8px 0}
+.rate .on,.chips .on{background:var(--amber);border-color:var(--amber);color:#000}
+.bub{position:relative;width:260px;max-width:100%;aspect-ratio:1;margin:18px auto 8px}
+.bub svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.bub circle{fill:none;stroke-width:2}.bub .rt{stroke:var(--line2)}.bub .rp{stroke:var(--amber);stroke-linecap:round}
+.ball{position:absolute;inset:16px;border-radius:50%;border:1px solid rgba(255,176,0,.55);background:radial-gradient(circle at 50% 42%,rgba(255,176,0,.34),rgba(255,176,0,.07) 68%,transparent);box-shadow:0 0 40px rgba(255,176,0,.12);transform:scale(.45);will-change:transform}
+.cue{position:absolute;inset:0;display:grid;place-content:center;gap:4px;text-align:center;color:var(--amber);letter-spacing:.24em;font-weight:600}
+.cue em{font-style:normal;font-size:28px;letter-spacing:0;color:var(--tx)}
+.clock{font-size:22px;font-weight:600;text-align:center;margin-bottom:4px;letter-spacing:.04em}
+.held .ball{opacity:.45}.held .cue,.clock.held{color:var(--dim)}
+.c{text-align:center}
+.cue small{font-size:10px;color:var(--dim);letter-spacing:.2em}
+.gp{text-align:center;min-height:3em;margin:4px 0 10px;font-size:14px;line-height:1.5;color:var(--tx)}
+.rv textarea{width:100%;margin-bottom:10px;font-size:14px}
+.ball.flame{inset:70px 92px 40px;border-radius:50% 50% 45% 45%/62% 62% 38% 38%;border:0;background:radial-gradient(ellipse at 50% 70%,#fff3c4 0,#ffb000 38%,rgba(255,90,0,.35) 70%,transparent 72%);box-shadow:0 0 60px rgba(255,150,0,.35);animation:fl 2.6s ease-in-out infinite}
+@keyframes fl{0%,100%{filter:brightness(1)}40%{filter:brightness(1.18)}55%{filter:brightness(.9)}}
+.ball.pin{inset:108px;border:0;background:var(--amber);box-shadow:0 0 24px rgba(255,176,0,.5)}
+label.ck{flex-direction:row;align-items:center;gap:8px;margin:2px 0 8px;text-transform:none;letter-spacing:0;font-size:12px;color:var(--tx)}
+label.ck input{width:auto}
+[hidden]{display:none!important}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:90vw;background:var(--panel);border:1px solid var(--amber);color:var(--amber);padding:8px 14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9}
+#toast.on{opacity:1}
+
+@media(max-width:1000px){.g4{grid-template-columns:1fr 1fr}.g21,.g3{grid-template-columns:1fr}}
+@media(max-width:560px){
+  body{padding-left:10px;padding-right:10px}
+  .g4,.fgrid{grid-template-columns:1fr}
+  .cd{min-height:50px;padding:3px}.cd em{display:none}.cd b{font-size:10px}
+  .eqs{gap:14px}
+  .rate{grid-template-columns:repeat(5,minmax(0,1fr))}
+}
+.bga{background:var(--amber)}
+.ca .ln{stroke:var(--amber)}.ca .ar{fill:rgba(255,176,0,.1)}
+.hl{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);margin-top:4px}
+.trow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.trow b{font-weight:600}.trow .dim{font-size:11px}
+.trow button{flex:none}
+.gp{text-align:center;min-height:3em;margin:4px 0 10px;font-size:14px;line-height:1.5}
+.lnk{border:0;padding:0;background:none;color:var(--amber);text-decoration:underline;font-size:11px;letter-spacing:0}
+.lnk:hover{color:var(--amber)}
+fieldset{border:1px solid var(--line);padding:12px;margin:0 0 12px;min-width:0}
+legend{color:var(--amber);font-size:11px;letter-spacing:.14em;padding:0 6px}
+fieldset>label{margin-bottom:10px}
+.pair{display:flex;gap:6px}.pair input{flex:1;min-width:0}.pair select{width:auto!important}
+.grow{display:flex;gap:6px;margin-bottom:6px}.grow input[name=gn]{flex:1;min-width:0}.grow input[name=gt]{width:64px}
+#hf>button{width:100%;margin-bottom:12px}
+.empty .chips{margin:10px 0 12px}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">ISIONXXX <b>//</b> REWIRE<i class="cur"></i></div>
+  <div class="acts">
+    <button class="pri" data-a="urge">&#9654; URGE</button>
+    <button data-a="add">+ LOG</button>
+    <button data-a="habits">HABITS</button>
+    <button data-a="note">NOTES</button>
+    <input id="file" type="file" accept=".json,application/json" hidden>
+  </div>
+</header>
+<div class="bar">
+  <select data-f="h" aria-label="Habit"></select>
+  <select data-f="range" aria-label="Range"></select>
+  <span id="scope" class="dim"></span>
+</div>
+<main id="app"></main>
+<dialog id="dlg"></dialog>
+<div id="toast" role="status"></div>
+
+<script>
+'use strict';
+const KEY='isx.rewire.v1', RUN='isx.rewire.run', PAGE=20, DAY=864e5;
+const RANGES={today:'Today',week:'This week',month:'This month',all:'All time'};
+const TRIG=['Boredom','Stress','Tired','Lonely','Anxious','Phone in hand','After a meal','Social','Celebrating','Work break','Late night','Other'];
+// suggested swaps for common habits; anything can be typed in instead
+const BAD={
+  'Doomscrolling':['Read 5 pages','Walk 10 min','Text a friend','Breathing reset'],
+  'Smoking':['Chew gum','Drink water','Walk 10 min','Breathing reset'],
+  'Vaping':['Chew gum','Drink water','Walk 10 min','Breathing reset'],
+  'Alcohol':['Sparkling water','Walk 10 min','Call a friend','Journal 5 min'],
+  'Junk food / sugar':['Drink water','Eat fruit','Walk 10 min','Brush teeth'],
+  'Late-night snacking':['Herbal tea','Brush teeth','Read 5 pages','Go to bed on time'],
+  'Procrastination':['Work 5 min (just start)','Write the next step','Tidy 5 min','Breathing reset'],
+  'Gaming too much':['Walk 10 min','Read 5 pages','Call a friend','Stretch 5 min'],
+  'Porn':['Cold shower','Walk 10 min','20 push-ups','Leave the room'],
+  'Gambling':['Call a friend','Walk 10 min','Journal 5 min','Check the budget'],
+  'Online shopping':['Wait 24 h list','Check the budget','Walk 10 min','Read 5 pages'],
+  'Nail biting':['Squeeze a stress ball','Wash hands','Chew gum','Breathing reset'],
+  'Caffeine':['Drink water','Herbal tea','Walk 10 min','Power nap 15 min']
+};
+const GOOD=['Drink water','Walk 10 min','20 push-ups','Read 5 pages','Meditate 5 min','Journal 5 min','Stretch 5 min','Breathing reset',
+  'Call a friend','Text a friend','Cold shower','Tidy 5 min','Eat fruit','Herbal tea','Sparkling water','Chew gum','Brush teeth',
+  'Go to bed on time','Work 5 min (just start)','Leave the room'];
+// urge surfing: prompts rotate through the surf; urges rise, peak and pass
+const SURF=['Notice where the urge sits in your body. Just notice it.','Name it: this is an urge. It is not an order.',
+  'Breathe slowly. Let the wave rise. You don\'t have to act on it.','Watch it change. Stronger, weaker, shifting.',
+  'Remember why: {why}','It is already passing. Stay with the breath.','Next: do {rep}.'];
+const CALM=[['INHALE',4],['EXHALE',6]];
+
+const $=s=>document.querySelector(s), dlg=$('#dlg');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const r2=v=>Math.round(v*100)/100;
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const pd=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const dtl=ms=>{const d=new Date(ms);return `${ymd(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`};
+const dlabel=s=>pd(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+const tfmt=ms=>new Date(ms).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+const n1=v=>(+v).toLocaleString('en-US',{maximumFractionDigits:1});
+const fm=m=>{const t=Math.max(0,Math.round(m*60));return `${Math.floor(t/60)}:${pad(t%60)}`};
+const span=ms=>{ms=Math.max(0,ms);const d=Math.floor(ms/DAY),h=Math.floor(ms%DAY/36e5),m=Math.floor(ms%36e5/6e4);return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m`};
+const money=(v,u)=>u==='min'?(v>=60?`${Math.floor(v/60)}h ${Math.round(v%60)}m`:`${Math.round(v)}m`):'$'+Math.round(v).toLocaleString('en-US');
+const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+
+/* ---------- state ----------
+   bad:  habits to break  {id,name,why,cost,unit:'$'|'min',goal(days),start(ms),reps:[good habit names]}
+   good: habits to build  {name,target(per day)}
+   log:  {id,at,t:'resist'|'slip'|'done',b(bad id),g(good name),int(1-10),trig,note} — a resisted urge may carry the swap it led to */
+let S=load();
+const U={h:'all',range:'all',page:0,month:null};
+function load(){
+  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.log))return {bad:s.bad||[],good:s.good||[],log:s.log,notes:s.notes||{}}}catch(e){}
+  return {bad:[],good:[],log:[],notes:{}};
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Storage write failed — take a backup')}}
+function setMonth(ms){const d=new Date(ms);U.month={y:d.getFullYear(),m:d.getMonth()}}
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),3200)}
+const badOf=id=>S.bad.find(b=>b.id===id);
+const isDone=e=>e.t==='done'||(e.t==='resist'&&e.g);
+
+/* ---------- numbers ---------- */
+function inRange(day){
+  const today=ymd(new Date()),wk=s=>{const d=pd(s);d.setDate(d.getDate()-d.getDay());return ymd(d)};
+  return U.range==='all'||(U.range==='today'?day===today:U.range==='week'?wk(day)===wk(today):U.range==='month'?day.slice(0,7)===today.slice(0,7):day===U.range);
+}
+// the selected bad habit; good-habit check-offs always count (they belong to every habit)
+const view=(useRange=true)=>S.log.map(e=>({...e,day:ymd(new Date(e.at))}))
+  .filter(e=>(U.h==='all'||e.t==='done'||e.b===U.h)&&(!useRange||inRange(e.day))).sort((a,b)=>a.at-b.at);
+// clean streak = time since the last slip (or since you started); best = the longest gap between slips
+function streak(ids){
+  const now=Date.now();let cur=Infinity,best=0,goal=0;
+  ids.forEach(id=>{
+    const b=badOf(id);if(!b)return;goal=Math.max(goal,b.goal||30);
+    const sl=S.log.filter(e=>e.t==='slip'&&e.b===id).map(e=>e.at).sort((a,c)=>a-c);
+    const pts=[b.start,...sl.filter(t=>t>=b.start),now];let bb=0;
+    for(let i=1;i<pts.length;i++)bb=Math.max(bb,pts[i]-pts[i-1]);
+    cur=Math.min(cur,now-pts[pts.length-2]);best=Math.max(best,bb);
+  });
+  return {cur:isFinite(cur)?cur:0,best,goal};
+}
+function stats(T){
+  const U2=T.filter(e=>e.t!=='done'),R=U2.filter(e=>e.t==='resist'),L=U2.filter(e=>e.t==='slip'),I=U2.filter(e=>e.int!=null);
+  const D={};T.forEach(e=>{const d=D[e.day]??={r:0,s:0,g:0,i:0,n:0};if(e.t==='resist')d.r++;if(e.t==='slip')d.s++;if(isDone(e))d.g++;if(e.int!=null){d.i+=e.int;d.n++}});
+  const dk=Object.keys(D).sort(),hours=Array(24).fill(0),tr={};
+  U2.forEach(e=>{hours[new Date(e.at).getHours()]++;if(e.trig){const t=tr[e.trig]??={n:0,s:0};t.n++;if(e.t==='slip')t.s++}});
+  const saved={$:0,min:0};R.forEach(e=>{const b=badOf(e.b);if(b&&b.cost)saved[b.unit==='min'?'min':'$']+=+b.cost});
+  const half=Math.floor(I.length/2),avg=a=>a.length?a.reduce((s,e)=>s+e.int,0)/a.length:null;
+  return {urges:U2.length,r:R.length,s:L.length,done:T.filter(isDone).length,saved,dk,D,hours,
+    trig:Object.entries(tr).sort((a,b)=>b[1].n-a[1].n),int:avg(I),early:avg(I.slice(0,half)),late:avg(I.slice(half)),
+    cleanDays:dk.filter(k=>!D[k].s).length};
+}
+
+/* ---------- svg ---------- */
+const ARC='M12 62A50 50 0 0 1 112 62', ND='<div class="nd">NO DATA_</div>';
+function gauge(segs,label){
+  let off=0;
+  const arcs=segs.map(([v,c])=>{const a=`<path class="${c}" d="${ARC}" pathLength="100" stroke-dasharray="${(v*100).toFixed(2)} 100" stroke-dashoffset="${(-off*100).toFixed(2)}"/>`;off+=v;return a}).join('');
+  return `<svg class="gauge" viewBox="0 0 124 70"><path class="s0" d="${ARC}"/>${arcs}<text x="62" y="60" text-anchor="middle">${label}</text></svg>`;
+}
+function line(vals,c){
+  const w=600,h=160,p=6,n=vals.length;if(n<2)return ND;
+  const lo=Math.min(0,...vals),hi=Math.max(1,...vals),rg=hi-lo||1;
+  const x=i=>(p+i*(w-2*p)/(n-1)).toFixed(1),y=v=>(p+(hi-v)*(h-2*p)/rg).toFixed(1);
+  const pts=vals.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
+  return `<svg class="chart ${c}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polygon class="ar" points="${x(0)},${y(0)} ${pts} ${x(n-1)},${y(0)}"/><line class="z" x1="0" x2="${w}" y1="${y(0)}" y2="${y(0)}"/><polyline class="ln" points="${pts}"/></svg>`;
+}
+// stacked bars: [[value,class],...] per column
+function stack(cols){
+  const w=600,h=160,p=6,lb=0,n=cols.length;if(!n||!cols.some(c=>c.some(v=>v[0])))return ND;
+  const hi=Math.max(1,...cols.map(c=>c.reduce((s,v)=>s+v[0],0))),step=(w-2*p)/n,bw=Math.min(60,step*.7),H=h-p-lb;
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${cols.map((c,i)=>{let y=H;
+    return c.map(([v,k])=>{const hh=v/hi*(H-p);y-=hh;return v?`<rect class="${k}" x="${(p+i*step+(step-bw)/2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${hh.toFixed(1)}"/>`:''}).join('')}).join('')}
+    <line class="z" x1="0" x2="${w}" y1="${H}" y2="${H}"/></svg>`;
+}
+
+/* ---------- render ---------- */
+const lg=(dot,label,a,b='')=>`<div class="lg"><i class="dot ${dot}"></i><span>${label}</span><b>${a}</b><em>${b}</em></div>`;
+const ev=(label,val,v)=>`<div class="ev"><span><i class="dot ${v>0?'bgp':v<0?'bgn':'bgd'}"></i> ${label}</span><b class="${v>0?'pos':v<0?'neg':''}">${val}</b></div>`;
+const kv=(k,v)=>`<div><span class="k">${k}</span><b>${v}</b></div>`;
+
+function calendar(){
+  const D={};view(false).forEach(e=>{const d=D[e.day]??={r:0,s:0,g:0};if(e.t==='resist')d.r++;if(e.t==='slip')d.s++;if(isDone(e))d.g++});
+  const {y,m}=U.month,lead=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),rows=Math.ceil((lead+dim)/7),today=ymd(new Date());
+  let h='',cl=0,sl=0;
+  for(let r=0;r<rows;r++){
+    let wr=0,ws=0,wg=0;
+    for(let c=0;c<7;c++){
+      const d=r*7+c-lead+1;
+      if(d<1||d>dim){h+='<div class="cd off"></div>';continue}
+      const k=`${y}-${pad(m+1)}-${pad(d)}`,x=D[k];
+      if(x){wr+=x.r;ws+=x.s;wg+=x.g;if(x.s)sl++;else cl++}
+      h+=`<button class="cd${c%6?'':' we'}${x?x.s?' n':' p':''}${k===U.range?' sel':''}${k===today?' now':''}" data-a="day" data-v="${k}"><span>${d}${S.notes[k]?' <i class="amb">*</i>':''}</span>${x?`<b class="${x.s?'neg':'pos'}">${x.s?x.s+' slip'+(x.s>1?'s':''):'clean'}</b><em>${x.r} beat · ${x.g} good</em>`:''}</button>`;
+    }
+    h+=`<div class="cd wk">${wr+ws+wg?`<b class="${ws?'neg':'pos'}">${ws?ws+' slip'+(ws>1?'s':''):'clean'}</b><em>${wr} beat</em>`:'<em>—</em>'}</div>`;
+  }
+  return `<div class="card">
+  <div class="rowh"><div><p class="h">Calendar</p><div class="k">Clean days this month</div><div class="big pos">${cl}</div></div>
+   <div>Clean: <b class="pos">${cl}</b> &nbsp; Slip: <b class="neg">${sl}</b></div></div>
+  <div class="cal">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat','Week'].map(d=>`<div class="dw">${d}</div>`).join('')}${h}</div>
+  <div class="calf"><div><button data-a="prev" aria-label="Previous month">&lt;</button> <b>${new Date(y,m,1).toLocaleDateString('en-US',{month:'long',year:'numeric'})}</b> <button data-a="next" aria-label="Next month">&gt;</button> <button data-a="tod">TODAY</button></div>
+   <span class="dim">Tap a day to filter · * = note</span></div></div>`;
+}
+
+function today(){
+  const t=ymd(new Date()),L=S.log.filter(e=>ymd(new Date(e.at))===t);
+  const bad=S.bad.map(b=>{const st=streak([b.id]),u=L.filter(e=>e.b===b.id&&e.t!=='done');
+    return `<div class="trow"><div><b>${esc(b.name)}</b><div class="dim">${span(st.cur)} clean · ${u.filter(e=>e.t==='resist').length} beaten today</div></div><button class="pri" data-a="urge" data-v="${b.id}">URGE</button></div>`}).join('');
+  const good=S.good.map(g=>{const n=L.filter(e=>isDone(e)&&e.g===g.name).length,tg=g.target||1;
+    return `<div class="trow"><div><b class="${n>=tg?'pos':''}">${esc(g.name)}</b><div class="dim">${n} / ${tg} today${n>=tg?' ✓':''}</div></div><button data-a="done" data-v="${esc(g.name)}">+ DONE</button></div>`}).join('');
+  return `<div class="card"><p class="h">Today</p>
+   <div class="sec first">Breaking</div>${bad||'<p class="dim">No habit to break yet_</p>'}
+   <div class="sec">Building</div>${good||'<p class="dim">No good habits yet_</p>'}
+   <div class="calf"><span class="dim">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}</span><button data-a="habits">EDIT HABITS</button></div></div>`;
+}
+
+function table(T){
+  const rows=[...T].reverse(),pages=Math.max(1,Math.ceil(rows.length/PAGE)),na='<span class="dim">—</span>';
+  U.page=Math.min(Math.max(U.page,0),pages-1);
+  const what=e=>e.t==='done'?`<b class="pos">GOOD</b>`:e.t==='slip'?`<b class="neg">SLIP</b>`:`<b class="pos">BEAT URGE</b>`;
+  const body=rows.slice(U.page*PAGE,(U.page+1)*PAGE).map(e=>`<tr>
+   <td>${tfmt(e.at)}</td><td>${what(e)}</td><td>${e.b?esc(badOf(e.b)?.name||'—'):na}</td><td>${e.g?esc(e.g):na}</td>
+   <td class="r">${e.int??na}</td><td class="dim">${esc(e.trig)||'—'}</td>
+   <td class="dim" title="${esc(e.note)}">${esc((e.note||'').length>40?e.note.slice(0,39)+'…':e.note||'')}</td>
+   <td class="r"><button data-a="edit" data-v="${e.id}">EDIT</button> <button data-a="del" data-v="${e.id}" aria-label="Delete entry">X</button></td></tr>`).join('');
+  return `<div class="card"><div class="rowh"><p class="h">Log</p><button data-a="csv">EXPORT CSV</button></div>
+  <div class="tw"><table><thead><tr><th>Time (local)</th><th>Event</th><th>Breaking</th><th>Good habit</th><th class="r">Urge</th><th>Trigger</th><th>Note</th><th></th></tr></thead>
+  <tbody>${body||'<tr><td colspan="8" class="dim">Nothing in this view_</td></tr>'}</tbody></table></div>
+  <div class="calf"><div><button data-a="pp">&lt;</button> Page <b>${U.page+1}</b> of ${pages} <button data-a="pn">&gt;</button></div><span class="dim">${rows.length} record${rows.length===1?'':'s'}</span></div></div>`;
+}
+
+function render(){
+  if(U.h!=='all'&&!badOf(U.h))U.h='all';
+  const T=view(),s=stats(T),ids=U.h==='all'?S.bad.map(b=>b.id):[U.h],st=streak(ids),gf=st.goal?Math.min(1,st.cur/(st.goal*DAY)):0;
+  const t=ymd(new Date()),tgt=S.good.reduce((a,g)=>a+(g.target||1),0),dn=S.log.filter(e=>isDone(e)&&ymd(new Date(e.at))===t).length;
+  $('[data-f=h]').innerHTML='<option value="all">All habits</option>'+S.bad.map(b=>`<option value="${b.id}"${b.id===U.h?' selected':''}>${esc(b.name)}</option>`).join('');
+  $('[data-f=range]').innerHTML=Object.entries(RANGES).map(([k,v])=>`<option value="${k}"${k===U.range?' selected':''}>${v}</option>`).join('')+(U.range in RANGES?'':`<option value="${U.range}" selected>${dlabel(U.range)}</option>`);
+  $('#scope').textContent=`Statistics for ${U.h==='all'?'All Habits':badOf(U.h).name} — ${RANGES[U.range]||dlabel(U.range)}`;
+  const sv=[s.saved.$?money(s.saved.$,'$'):'',s.saved.min?money(s.saved.min,'min'):''].filter(Boolean).join(' + ')||'—';
+  const trend=s.early!=null&&s.late!=null&&s.urges>=4?s.late-s.early:null;
+  const dk=s.dk,hoursMax=Math.max(...s.hours),danger=hoursMax?s.hours.indexOf(hoursMax):null;
+  const hr=h=>h==null?'—':new Date(2000,0,1,h).toLocaleTimeString('en-US',{hour:'numeric'});
+
+  $('#app').innerHTML=`${S.bad.length?'':`<div class="card empty"><p class="h">What do you want to break?</p><p class="dim">Pick a habit to start, or load a sample month to see how it reads. You can rename it and choose its replacements next.</p>
+   <div class="chips">${Object.keys(BAD).map(n=>`<button data-a="pick" data-v="${esc(n)}">${esc(n)}</button>`).join('')}<button data-a="pick" data-v="">+ OTHER</button></div>
+   <button data-a="sample">LOAD SAMPLE</button></div>`}
+<section class="g g4">
+ <div class="card"><p class="h">Clean streak</p><div class="k">Since last slip</div><div class="big pos">${S.bad.length?span(st.cur):'—'}</div>
+  ${gauge([[gf,'sg']],st.goal?Math.round(gf*100)+'%':'—')}
+  ${lg('bgp','Current',span(st.cur))}${lg('bgd','Best',span(st.best))}${lg('bga','Goal',(st.goal||'—')+' days')}</div>
+ <div class="card"><p class="h">Resist rate</p><div class="k">Urges logged</div><div class="big">${s.urges}</div>
+  ${gauge([[s.urges?s.r/s.urges:0,'sg'],[s.urges?s.s/s.urges:0,'sr']],pct(s.r,s.urges))}
+  ${lg('bgp','Beaten',s.r,pct(s.r,s.urges))}${lg('bgn','Slipped',s.s,pct(s.s,s.urges))}${lg('bgd','Clean days',s.cleanDays,pct(s.cleanDays,dk.length))}</div>
+ <div class="card"><p class="h">Good habits</p><div class="k">Done in range</div><div class="big">${s.done}</div>
+  ${gauge([[tgt?Math.min(1,dn/tgt):0,'sg']],tgt?`${dn}/${tgt}`:'—')}
+  ${S.good.slice(0,3).map(g=>{const n=T.filter(e=>isDone(e)&&e.g===g.name).length;return lg('bgp',esc(g.name),n)}).join('')||lg('bgd','None yet','—')}</div>
+ <div class="card"><p class="h">Saved</p><div class="k">By urges beaten</div><div class="big pos">${sv}</div>
+  ${ev('Urges beaten',s.r,s.r)}${ev('Avg urge strength',s.int==null?'—':s.int.toFixed(1)+' / 10')}
+  ${ev('Urge strength trend',trend==null?'—':(trend<=0?'▼ ':'▲ ')+Math.abs(trend).toFixed(1),trend==null?0:-trend)}
+  <div class="ev rule"><span class="dim">Danger hour</span><b class="amb">${hr(danger)}</b></div></div>
+</section>
+<section class="g g21">${calendar()}${today()}</section>
+<section class="g g21">
+ <div class="card"><div class="rowh"><div><p class="h">Urges per day</p><div class="big">${s.urges}</div></div>
+  <div class="eqs">${kv('Beaten',`<span class="pos">${s.r}</span>`)}${kv('Slipped',`<span class="neg">${s.s}</span>`)}${kv('Good habits',s.done)}${kv('Days',dk.length)}</div></div>
+  ${stack(dk.map(k=>[[s.D[k].r,'fp'],[s.D[k].s,'fn']]))}</div>
+ <div class="card"><p class="h">Danger hours</p><div class="k">Urges by hour of day</div><div class="big amb">${hr(danger)}</div>${stack(s.hours.map(v=>[[v,'fa']]))}<div class="hl"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11 PM</span></div></div>
+</section>
+<section class="g g3">
+ <div class="card"><p class="h">Triggers</p><div class="k">What sets urges off</div>
+  ${s.trig.length?s.trig.slice(0,7).map(([k,v])=>`<div class="ev"><span>${esc(k)}</span><b>${v.n} <span class="${v.s?'neg':'dim'}">· ${pct(v.s,v.n)} slip</span></b></div><div class="hb"><i class="${v.s/v.n>.5?'bgn':'bga'}" style="width:${(v.n/s.trig[0][1].n*100).toFixed(1)}%"></i></div>`).join(''):ND}</div>
+ <div class="card"><p class="h">Urge strength</p><div class="k">Average per day · lower is better</div><div class="big">${s.int==null?'—':s.int.toFixed(1)}</div>
+  ${line(dk.filter(k=>s.D[k].n).map(k=>r2(s.D[k].i/s.D[k].n)),'ca')}</div>
+ <div class="card"><p class="h">Wins</p><div class="k">Urges beaten + good habits, cumulative</div><div class="big pos">${s.r+s.done}</div>
+  ${line(dk.reduce((a,k)=>(a.push((a.at(-1)||0)+s.D[k].r+s.D[k].g),a),[]),'cg')}</div>
+</section>
+${table(T)}
+<footer><p>Urges rise, peak and pass, usually within minutes. Surf them, swap in a good habit, and the old loop weakens each time. If a habit involves alcohol, drugs or gambling and feels out of your control, talk to a doctor or a support line — stopping some substances suddenly needs medical help.</p>
+ Data lives on this device only <button data-a="bak">BACKUP JSON</button><button data-a="imp">RESTORE</button><button data-a="clear">CLEAR ALL</button></footer>`;
+}
+
+/* ---------- habits setup ---------- */
+function habitsForm(pick){
+  const B=S.bad.map(b=>({...b,reps:[...b.reps]})),G=S.good.map(g=>({...g}));
+  if(pick!=null){const reps=BAD[pick]||['Walk 10 min','Drink water','Breathing reset'];
+    B.push({id:uid(),name:pick,why:'',cost:'',unit:'$',goal:30,start:Date.now(),reps});
+    reps.forEach(r=>{if(!G.some(g=>g.name===r))G.push({name:r,target:1})})}
+  if(!B.length)B.push({id:uid(),name:'',why:'',cost:'',unit:'$',goal:30,start:Date.now(),reps:[]});
+  const draw=()=>{
+    dlg.innerHTML=`<form id="hf"><h3>HABITS</h3>
+    ${B.map((b,i)=>`<fieldset data-i="${i}"><legend>BREAK ${i+1}</legend>
+     <div class="fgrid">
+      <label>Habit to break<input name="name" list="badl" required autocomplete="off" placeholder="Doomscrolling" value="${esc(b.name)}"></label>
+      <label>Clean since<input name="start" type="date" value="${ymd(new Date(b.start))}"></label>
+      <label>Cost per slip (optional)<span class="pair"><input name="cost" type="number" min="0" step="any" placeholder="0" value="${b.cost}"><select name="unit"><option value="$"${b.unit!=='min'?' selected':''}>$</option><option value="min"${b.unit==='min'?' selected':''}>min</option></select></span></label>
+      <label>Streak goal (days)<input name="goal" type="number" min="1" step="1" value="${b.goal||30}"></label>
+     </div>
+     <label>Why you're quitting<input name="why" autocomplete="off" placeholder="More focus. Sleep better. Be present." value="${esc(b.why)}"></label>
+     <span class="k">Replace it with — tap to choose</span>
+     <div class="chips">${[...new Set([...b.reps,...(BAD[b.name]||[]),...G.map(g=>g.name)])].map(r=>`<button type="button" data-rep="${esc(r)}"${b.reps.includes(r)?' class="on"':''}>${esc(r)}</button>`).join('')}</div>
+     ${B.length>1?`<button type="button" class="lnk" data-rm="${i}">Remove this habit</button>`:''}
+    </fieldset>`).join('')}
+    <button type="button" id="ab">+ ANOTHER HABIT TO BREAK</button>
+    <fieldset><legend>BUILD</legend>
+     ${G.map((g,i)=>`<div class="grow" data-g="${i}"><input name="gn" value="${esc(g.name)}" aria-label="Good habit"><input name="gt" type="number" min="1" step="1" value="${g.target||1}" aria-label="Times per day" title="Times per day"><button type="button" data-gx="${i}" aria-label="Remove">X</button></div>`).join('')||'<p class="dim">No good habits yet_</p>'}
+     <span class="k">Add a good habit</span>
+     <div class="chips">${GOOD.filter(n=>!G.some(g=>g.name===n)).map(n=>`<button type="button" data-add="${esc(n)}">+ ${esc(n)}</button>`).join('')}<input id="gnew" placeholder="Your own" aria-label="Your own good habit" style="width:150px"><button type="button" id="gadd">ADD</button></div>
+     <p class="dim">The number next to each one is how many times a day you aim for.</p>
+    </fieldset>
+    <datalist id="badl">${Object.keys(BAD).map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+    <div class="fa2"><span id="pv"></span><button type="button" data-a="x">CANCEL</button><button class="pri">SAVE</button></div></form>`;
+    const f=$('#hf');
+    // keep typed values when the form redraws
+    const sync=()=>{
+      f.querySelectorAll('fieldset[data-i]').forEach(fs=>{const b=B[+fs.dataset.i],q=n=>fs.querySelector(`[name=${n}]`).value;
+        b.name=q('name').trim();b.why=q('why').trim();b.cost=q('cost');b.unit=q('unit');b.goal=Math.max(1,Math.round(+q('goal'))||30);
+        const d=q('start');if(d)b.start=pd(d).getTime()});
+      f.querySelectorAll('.grow').forEach(r=>{const g=G[+r.dataset.g];g.name=r.querySelector('[name=gn]').value.trim();g.target=Math.max(1,Math.round(+r.querySelector('[name=gt]').value)||1)});
+    };
+    const add=n=>{n=n.trim();if(n&&!G.some(g=>g.name.toLowerCase()===n.toLowerCase()))G.push({name:n,target:1})};
+    f.onclick=ev=>{
+      const t=ev.target.closest('button');if(!t||t.type==='submit'||t.dataset.a)return;sync();
+      if(t.dataset.rep!=null){const b=B[+t.closest('fieldset').dataset.i],r=t.dataset.rep;b.reps=b.reps.includes(r)?b.reps.filter(x=>x!==r):[...b.reps,r];add(r)}
+      else if(t.dataset.rm!=null)B.splice(+t.dataset.rm,1);
+      else if(t.dataset.gx!=null)G.splice(+t.dataset.gx,1);
+      else if(t.dataset.add!=null)add(t.dataset.add);
+      else if(t.id==='gadd')add($('#gnew').value);
+      else if(t.id==='ab')B.push({id:uid(),name:'',why:'',cost:'',unit:'$',goal:30,start:Date.now(),reps:[]});
+      const y=dlg.scrollTop;draw();dlg.scrollTop=y;
+    };
+    f.onsubmit=ev=>{
+      ev.preventDefault();sync();
+      const bad=B.filter(b=>b.name),good=G.filter(g=>g.name);
+      if(!bad.length){$('#pv').innerHTML='<b class="neg">Name the habit to break</b>';return}
+      bad.forEach(b=>{b.cost=b.cost===''?'':Math.max(0,+b.cost);b.reps=b.reps.filter(r=>good.some(g=>g.name===r))});
+      S.bad=bad;S.good=good;save();dlg.close();render();toast('Habits saved');
+    };
+  };
+  draw();dlg.showModal();
+}
+
+/* ---------- urge surfing ----------
+   ▶ URGE: rate it, name the trigger, then surf it for a few minutes on the breathing bubble while prompts walk
+   you through it. Finish with BEAT IT (and the swap you did) or SLIPPED. Kept in localStorage like the other apps. */
+let R=null,RI=0,RA=0,WL=null,AC=null;
+try{R=JSON.parse(localStorage.getItem(RUN))}catch(e){}
+const keepRun=()=>{try{localStorage.setItem(RUN,JSON.stringify(R))}catch(e){}};
+const elapsed=()=>Date.now()-R.t0;
+const rpick=(n,label,v)=>`<span class="k">${label}</span><div class="rate" data-n="${n}">${[1,2,3,4,5,6,7,8,9,10].map(i=>`<button type="button" data-r="${i}"${v===i?' class="on"':''}>${i}</button>`).join('')}</div>`;
+const rval=n=>{const b=dlg.querySelector(`.rate[data-n="${n}"] .on`);return b?+b.dataset.r:null};
+const cpick=(n,list,v)=>`<div class="chips" data-c="${n}">${list.map(x=>`<button type="button" data-cv="${esc(x)}"${x===v?' class="on"':''}>${esc(x)}</button>`).join('')}</div>`;
+const cval=n=>dlg.querySelector(`[data-c="${n}"] .on`)?.dataset.cv??null;
+dlg.addEventListener('click',e=>{
+  const b=e.target.closest('[data-r],[data-cv]');if(!b)return;
+  const on=b.classList.contains('on');b.parentNode.querySelectorAll('.on').forEach(x=>x.classList.remove('on'));
+  if(!on)b.classList.add('on');b.dispatchEvent(new Event('input',{bubbles:true}));
+});
+dlg.addEventListener('cancel',e=>{if(R)e.preventDefault()});
+function bell(n=1){
+  try{
+    AC??=new (window.AudioContext||window.webkitAudioContext)();AC.resume();
+    for(let i=0;i<n;i++){const t=AC.currentTime+i*2.4;
+      [[220,1],[220*2.76,.45],[220*5.4,.18]].forEach(([f,a])=>{const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=f;
+        g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.12*a,t+.015);g.gain.exponentialRampToValueAtTime(1e-4,t+5);
+        o.connect(g).connect(AC.destination);o.start(t);o.stop(t+5)})}
+  }catch(e){}
+}
+async function wake(on){try{if(on&&!WL){WL=await navigator.wakeLock?.request('screen');WL?.addEventListener('release',()=>WL=null)}else if(!on&&WL){WL.release();WL=null}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&R&&!R.end)wake(true)});
+function breath(ms){
+  let x=ms/1000%CALM.reduce((a,p)=>a+p[1],0),s=.45;
+  for(const[c,d]of CALM){const to=c==='INHALE'?1:.45;if(x<d)return {c,left:Math.ceil(d-x),s:s+(to-s)*(1-Math.cos(Math.PI*x/d))/2};x-=d;s=to}
+  return {c:'',left:0,s};
+}
+function clearRun(){clearInterval(RI);cancelAnimationFrame(RA);RI=0;R=null;try{localStorage.removeItem(RUN)}catch(e){}wake(false)}
+function draw(){clearInterval(RI);cancelAnimationFrame(RA);if(R.end)outcomeForm();else surfView();if(!dlg.open)dlg.showModal()}
+
+function urgeForm(bid){
+  if(!S.bad.length)return habitsForm();
+  const pref=(()=>{try{return JSON.parse(localStorage.getItem(RUN+'.pref'))||{}}catch(e){return {}}})();
+  let b=bid||(U.h!=='all'?U.h:S.bad[0].id);
+  dlg.innerHTML=`<form id="uf"><h3>URGE</h3>
+   ${S.bad.length>1?`<span class="k">Which habit</span><div class="chips" id="ub">${S.bad.map(x=>`<button type="button" data-b="${x.id}"${x.id===b?' class="on"':''}>${esc(x.name)}</button>`).join('')}</div>`:''}
+   ${rpick('int','How strong is it? (1–10)')}
+   <span class="k">What set it off?</span>${cpick('trig',TRIG)}
+   <span class="k">Surf it for</span>
+   <div class="chips" id="ul">${[1,3,5,10].map(m=>`<button type="button" data-m="${m}"${m===(pref.mins||3)?' class="on"':''}>${m} min</button>`).join('')}</div>
+   <p class="dim">Most urges peak and fade within minutes. Breathe with the bubble and let it pass.</p>
+   <div class="fa2"><button type="button" id="us">I ALREADY SLIPPED</button><button type="button" data-a="x">CANCEL</button><button class="pri">SURF IT</button></div></form>`;
+  const f=$('#uf');let mins=pref.mins||3;
+  f.addEventListener('click',ev=>{
+    const x=ev.target.closest('[data-b]'),m=ev.target.closest('[data-m]');
+    if(x){b=x.dataset.b;f.querySelectorAll('[data-b]').forEach(y=>y.classList.toggle('on',y===x))}
+    if(m){mins=+m.dataset.m;f.querySelectorAll('[data-m]').forEach(y=>y.classList.toggle('on',y===m))}
+  });
+  $('#us').onclick=()=>{
+    const now=Date.now();R={b,int:rval('int'),trig:cval('trig'),mins,t0:now,end:now,slipped:true};keepRun();draw();
+  };
+  f.onsubmit=ev=>{
+    ev.preventDefault();
+    try{localStorage.setItem(RUN+'.pref',JSON.stringify({mins}))}catch(e){}
+    R={b,int:rval('int'),trig:cval('trig'),mins,t0:Date.now(),end:null,rep:badOf(b).reps[0]||null};
+    bell(1);keepRun();draw();
+  };
+  dlg.showModal();
+}
+function surfView(){
+  const h=badOf(R.b),reps=h?.reps||[];
+  dlg.innerHTML=`<div><h3>SURF // ${esc(h?.name||'').toUpperCase()}</h3>
+  <div class="bub" id="bub"><svg viewBox="0 0 240 240" aria-hidden="true"><circle class="rt" cx="120" cy="120" r="118"/><circle class="rp" id="pg" cx="120" cy="120" r="118" pathLength="100" stroke-dasharray="0 100"/></svg>
+   <div class="ball" id="ball"></div><div class="cue" id="pc" aria-live="polite"></div></div>
+  <p class="gp" id="gp"></p>
+  <div class="clock" id="clk"></div>
+  ${reps.length?`<span class="k">Then swap in</span><div class="chips" id="sr">${reps.map(r=>`<button type="button" data-sr="${esc(r)}"${r===R.rep?' class="on"':''}>${esc(r)}</button>`).join('')}</div>`:''}
+  <div class="fa2"><button type="button" id="sl">I SLIPPED</button><button type="button" class="pri" id="sd">IT PASSED</button></div></div>`;
+  const len=R.mins*60000,P=SURF.map(p=>p.replace('{why}',h?.why||'you want this.').replace('{rep}',R.rep||'something good for you'));
+  const tick=()=>{
+    const ms=elapsed();if(ms>=len){bell(2);navigator.vibrate?.([200,120,200]);return finish(false)}
+    $('#clk').textContent=fm((len-ms)/60000);$('#pg').setAttribute('stroke-dasharray',`${(ms/len*100).toFixed(2)} 100`);
+    const b=breath(ms);$('#pc').innerHTML=`${b.c}<em>${b.left}</em>`;
+    $('#gp').textContent=P[Math.min(P.length-1,Math.floor(ms/len*P.length))];
+  };
+  const anim=()=>{const b=$('#ball');if(!R||R.end||!b)return;b.style.transform=`scale(${breath(elapsed()).s.toFixed(3)})`;RA=requestAnimationFrame(anim)};
+  RA=requestAnimationFrame(anim);
+  dlg.querySelectorAll('[data-sr]').forEach(x=>x.onclick=()=>{R.rep=x.dataset.sr;keepRun();dlg.querySelectorAll('[data-sr]').forEach(y=>y.classList.toggle('on',y===x));tick()});
+  const finish=slip=>{clearInterval(RI);cancelAnimationFrame(RA);R.end=Date.now();R.slipped=slip;keepRun();wake(false);draw()};
+  $('#sd').onclick=()=>finish(false);$('#sl').onclick=()=>finish(true);
+  RI=setInterval(tick,250);tick();wake(true);
+}
+function outcomeForm(){
+  const h=badOf(R.b),reps=h?.reps||[];
+  dlg.innerHTML=`<form id="of"><h3>${R.slipped?'SLIPPED':'URGE PASSED'} // ${esc(h?.name||'').toUpperCase()}</h3>
+   ${R.slipped?`<p class="dim">A slip is data, not a verdict. Note what happened. The streak restarts now, and the next urge is a fresh chance.</p>`
+   :`<p class="pos">You rode it out${R.end>R.t0?` in ${fm((R.end-R.t0)/60000)}`:''}. Each time, the loop gets weaker.</p>
+     ${reps.length?`<span class="k">Swap you did</span>${cpick('rep',reps,R.rep)}`:''}`}
+   ${R.int==null?rpick('int','How strong was it? (1–10)'):''}
+   ${R.trig?'':`<span class="k">What set it off?</span>${cpick('trig',TRIG)}`}
+   <label>Note<textarea name="note" rows="3" placeholder="${R.slipped?'Where, when, what would help next time.':'What helped.'}"></textarea></label>
+   <div class="fa2"><button type="button" id="ox">DISCARD</button>${R.slipped?'':'<button type="button" id="os">ACTUALLY SLIPPED</button>'}<button class="pri">SAVE</button></div></form>`;
+  const f=$('#of');
+  $('#ox').onclick=()=>{if(confirm('Discard this urge without logging it?')){clearRun();dlg.close()}};
+  $('#os')&&($('#os').onclick=()=>{R.slipped=true;keepRun();draw()});
+  f.onsubmit=ev=>{
+    ev.preventDefault();
+    const e={id:uid(),at:R.t0,t:R.slipped?'slip':'resist',b:R.b,int:R.int??rval('int'),trig:R.trig??cval('trig'),note:f.elements.note.value.trim()};
+    if(!R.slipped){const g=cval('rep');if(g)e.g=g}
+    S.log.push(e);save();clearRun();dlg.close();setMonth(e.at);render();
+    toast(e.t==='slip'?'Logged. Next urge, fresh start.':`Urge beaten${h?.cost?` · ${money(+h.cost,h.unit)} saved`:''}`);
+  };
+}
+
+/* ---------- manual entry ---------- */
+function entryForm(t){
+  if(!S.bad.length&&!S.good.length)return habitsForm();
+  const d=t||{t:'done',at:Date.now(),b:S.bad[0]?.id,g:S.good[0]?.name,int:null,trig:'',note:''};
+  dlg.innerHTML=`<form id="ef"><h3>${t?'EDIT':'NEW'} ENTRY</h3>
+  <div class="fgrid">
+   <label>Event<select name="t"><option value="done"${d.t==='done'?' selected':''}>Good habit done</option><option value="resist"${d.t==='resist'?' selected':''}>Urge beaten</option><option value="slip"${d.t==='slip'?' selected':''}>Slip</option></select></label>
+   <label>When<input name="when" type="datetime-local" required value="${dtl(d.at)}"></label>
+   <label data-t="rs">Breaking<select name="b">${S.bad.map(b=>`<option value="${b.id}"${b.id===d.b?' selected':''}>${esc(b.name)}</option>`).join('')}</select></label>
+   <label data-t="dr">Good habit<select name="g"><option value="">—</option>${[...new Set([...S.good.map(g=>g.name),d.g].filter(Boolean))].map(n=>`<option${n===d.g?' selected':''}>${esc(n)}</option>`).join('')}</select></label>
+   <label data-t="rs">Urge (1–10)<input name="int" type="number" min="1" max="10" step="1" value="${d.int??''}"></label>
+   <label data-t="rs">Trigger<select name="trig"><option value="">—</option>${[...new Set([...TRIG,d.trig].filter(Boolean))].map(x=>`<option${x===d.trig?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+  </div>
+  <label>Note<textarea name="note" rows="3">${esc(d.note||'')}</textarea></label>
+  <div class="fa2"><span id="pv"></span><button type="button" data-a="x">CANCEL</button><button class="pri">SAVE</button></div></form>`;
+  const f=$('#ef'),e=f.elements;
+  const sync=()=>f.querySelectorAll('[data-t]').forEach(l=>l.hidden=!l.dataset.t.includes(e.t.value.charAt(0)));
+  f.addEventListener('input',sync);sync();
+  f.onsubmit=ev=>{
+    ev.preventDefault();const ty=e.t.value,v={t:ty,at:new Date(e.when.value).getTime(),note:e.note.value.trim()};
+    if(ty!=='done'){if(!e.b.value){$('#pv').innerHTML='<b class="neg">Add a habit to break first</b>';return}
+      v.b=e.b.value;v.int=e.int.value===''?null:Math.min(10,Math.max(1,+e.int.value));v.trig=e.trig.value||null}
+    if(ty!=='slip'&&e.g.value)v.g=e.g.value;
+    if(ty==='done'&&!v.g){$('#pv').innerHTML='<b class="neg">Pick the good habit</b>';return}
+    if(t){const o=S.log.find(x=>x.id===t.id);['b','g','int','trig'].forEach(k=>delete o[k]);Object.assign(o,v)}else S.log.push({id:uid(),...v});
+    save();dlg.close();setMonth(v.at);render();
+  };
+  dlg.showModal();
+}
+function noteForm(day){
+  dlg.innerHTML=`<form id="nf"><h3>NOTES // ${dlabel(day)}</h3><textarea name="n" rows="10" placeholder="What was hard today. What helped. What to try tomorrow.">${esc(S.notes[day]||'')}</textarea>
+  <div class="fa2"><button type="button" data-a="x">CANCEL</button><button class="pri">SAVE</button></div></form>`;
+  $('#nf').addEventListener('submit',ev=>{ev.preventDefault();const v=ev.target.elements.n.value.trim();if(v)S.notes[day]=v;else delete S.notes[day];save();dlg.close();render()});
+  dlg.showModal();
+}
+
+/* ---------- import / export ---------- */
+function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function exportCSV(){
+  const T=view();if(!T.length)return toast('Nothing to export');
+  const q=v=>{v=String(v??'');return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v};
+  const rows=[['time','event','breaking','good_habit','urge','trigger','note'],
+    ...T.map(e=>[dtl(e.at),{done:'good habit',resist:'urge beaten',slip:'slip'}[e.t],badOf(e.b)?.name||'',e.g||'',e.int??'',e.trig||'',e.note||''])];
+  dl(`rewire-${ymd(new Date())}.csv`,rows.map(r=>r.map(q).join(',')).join('\n'),'text/csv');
+}
+function sample(){
+  // four weeks of quitting doomscrolling: urges get rarer and weaker, two early slips
+  const now=new Date(),id=uid(),at=(ago,h,m)=>new Date(now.getFullYear(),now.getMonth(),now.getDate()-ago,h,m).getTime();
+  S.bad=[{id,name:'Doomscrolling',why:'Sleep earlier and actually finish books.',cost:20,unit:'min',goal:30,start:at(27,8,0),reps:['Read 5 pages','Walk 10 min','Breathing reset']}];
+  S.good=[{name:'Read 5 pages',target:1},{name:'Walk 10 min',target:1},{name:'Breathing reset',target:2},{name:'Drink water',target:3}];
+  const T=['Boredom','Late night','Phone in hand','Work break','Tired','Stress'];
+  for(let ago=27;ago>=0;ago--){
+    const n=ago>18?4:ago>9?3:2;
+    for(let i=0;i<n;i++){
+      const h=[22,13,8,17][i],int=Math.max(2,Math.min(9,Math.round(8-(27-ago)*.18+((ago*7+i*3)%5-2)*.6)));
+      const slip=(ago===25&&i===0)||(ago===19&&i===0),t=at(ago,h,(ago*13+i*17)%60);if(t>Date.now())continue;
+      S.log.push({id:uid(),at:t,t:slip?'slip':'resist',b:id,int,trig:T[(ago+i*2)%T.length],note:'',...(slip?{}:{g:['Read 5 pages','Walk 10 min','Breathing reset'][(ago+i)%3]})});
+    }
+    if(ago%2===0&&at(ago,7,30)<Date.now())S.log.push({id:uid(),at:at(ago,7,30),t:'done',g:'Drink water',note:''});
+    if(ago%3!==1&&at(ago,12,15)<Date.now())S.log.push({id:uid(),at:at(ago,12,15),t:'done',g:'Walk 10 min',note:''});
+  }
+  save();boot();
+}
+
+/* ---------- events ---------- */
+const ACT={
+  urge:v=>R?draw():urgeForm(v),add:()=>entryForm(),habits:()=>habitsForm(),pick:v=>habitsForm(v),x:()=>dlg.close(),sample,csv:exportCSV,
+  note:()=>noteForm(U.range in RANGES?ymd(new Date()):U.range),imp:()=>$('#file').click(),
+  done:v=>{S.log.push({id:uid(),at:Date.now(),t:'done',g:v,note:''});save();render();toast(`${v} ✓`)},
+  bak:()=>dl(`rewire-backup-${ymd(new Date())}.json`,JSON.stringify(S),'application/json'),
+  clear:()=>{if(confirm('Delete ALL habits, entries and notes on this device?')){S={bad:[],good:[],log:[],notes:{}};save();U.range='all';U.h='all';boot()}},
+  prev:()=>shift(-1),next:()=>shift(1),tod:()=>{setMonth(Date.now());render()},
+  day:v=>{U.range=U.range===v?'all':v;U.page=0;render()},
+  edit:v=>entryForm(S.log.find(t=>t.id===v)),
+  del:v=>{if(confirm('Delete this entry?')){S.log=S.log.filter(t=>t.id!==v);save();render()}},
+  pp:()=>{U.page--;render()},pn:()=>{U.page++;render()}
+};
+function shift(k){const d=new Date(U.month.y,U.month.m+k,1);U.month={y:d.getFullYear(),m:d.getMonth()};render()}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b&&ACT[b.dataset.a])ACT[b.dataset.a](b.dataset.v)});
+document.addEventListener('change',e=>{const k=e.target.dataset.f;if(!k)return;U[k]=e.target.value;U.page=0;render()});
+$('#file').addEventListener('change',async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const s=JSON.parse(await f.text());if(!Array.isArray(s.log))throw 0;
+    if(!confirm(`Replace everything here with this backup (${s.log.length} entries)?`))return;
+    S={bad:s.bad||[],good:s.good||[],log:s.log,notes:s.notes||{}};save();boot();toast('Backup restored');
+  }catch(x){toast('Not a valid backup file')}
+});
+
+function boot(){setMonth(S.log.length?Math.max(...S.log.map(t=>t.at)):Date.now());render()}
+boot();
+if(R)draw();
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
