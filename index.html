@@ -214,23 +214,53 @@ const APPS={
 };
 // good habits that tick themselves off when you log in another app; day:1 = counts once per day
 const LINKS={
-  meditate:{app:'MIND',name:'Meditate',f:e=>e.kind==='M'},
-  breathwork:{app:'MIND',name:'Breathwork',f:e=>e.kind==='B'},
-  mjournal:{app:'MIND',name:'Journal',f:e=>e.kind==='J'},
-  mind:{app:'MIND',name:'Mind session'},
-  workout:{app:'TRAINING',name:'Workout',f:e=>e.type!=='S',day:1},
-  stretch:{app:'TRAINING',name:'Stretch',f:e=>e.type==='S',day:1},
-  meals:{app:'NUTRITION',name:'Log meals'},
-  bowl:{app:'NUTRITION',name:'Eat the balanced bowl',f:e=>e.kind==='bowl'},
+  meditate:{app:'MIND',name:'Meditate',f:e=>e.kind==='M',kind:'M'},
+  breathwork:{app:'MIND',name:'Breathwork',f:e=>e.kind==='B',kind:'B'},
+  mjournal:{app:'MIND',name:'Journal',f:e=>e.kind==='J',kind:'J'},
+  mind:{app:'MIND',name:'Mind session',kind:'M'},
+  workout:{app:'TRAINING',name:'Workout',f:e=>e.type!=='S',day:1,act:'go'},
+  stretch:{app:'TRAINING',name:'Stretch',f:e=>e.type==='S',day:1,act:'go'},
+  meals:{app:'NUTRITION',name:'Log meals',act:'quick'},
+  bowl:{app:'NUTRITION',name:'Eat the balanced bowl',f:e=>e.kind==='bowl',act:'cook'},
   study:{app:'LEARN',name:'Study session'},
-  trades:{app:'JOURNAL',name:'Review trades',day:1}
+  trades:{app:'JOURNAL',name:'Review trades',day:1,act:'add'}
 };
 // on GitHub Pages the apps sit side by side; anywhere else, point at the published copies
 const BASE=/github\.io$/.test(location.hostname)?location.origin+'/':'https://giovanij933.github.io/';
 const appUrl=a=>BASE+APPS[a].repo+'/';
 // inside the ISIONXXX app the others are tabs: ask it to switch instead of opening a new window
 const embedded=window.parent!==window;
-function openApp(a){if(embedded)parent.postMessage({isx:'open',app:a.toLowerCase()},location.origin);else window.open(appUrl(a),'_blank','noopener')}
+// act = the action to open it on (TRAINING's START, NUTRITION's + FOOD, JOURNAL's + TRADE)
+function openApp(a,act){if(embedded)parent.postMessage({isx:'open',app:a.toLowerCase(),act},location.origin);else window.open(appUrl(a)+(act?'#do='+act:''),'_blank','noopener')}
+/* A linked good habit is saved in the app it belongs to, never only here: then MIND, TRAINING, NUTRITION, LEARN,
+   JOURNAL, REWIRE and TODAY all show the same thing, and deleting it there removes it here too.
+   MIND and LEARN entries are just time, so they're written straight from here; the rest need that app's form. */
+const quickLog=k=>{const a=LINKS[k]?.app;return a==='MIND'||a==='LEARN'};
+function logTo(k,mins){
+  const L=LINKS[k],at=Date.now()-mins*6e4;
+  if(L.app==='MIND'){
+    let s;try{s=JSON.parse(localStorage.getItem('isx.mind.v1'))}catch(e){}
+    if(!s||!Array.isArray(s.log))s={...(s||{}),log:[],notes:s?.notes||{}};
+    s.log.push({id:uid(),at,kind:L.kind,tech:'',mins,pre:null,post:null,depth:null,note:'Logged from REWIRE'});
+    localStorage.setItem('isx.mind.v1',JSON.stringify(s));
+  }else if(L.app==='LEARN'){
+    let a;try{a=JSON.parse(localStorage.getItem('xl.sessions.v1'))}catch(e){}
+    if(!Array.isArray(a))a=[];
+    a.push({id:uid(),time:new Date(at).toISOString(),min:mins,lessons:[],tracks:[]});
+    localStorage.setItem('xl.sessions.v1',JSON.stringify(a));
+  }
+}
+function linkedDone(g){
+  const k=g.link,L=LINKS[k];
+  if(!quickLog(k))return openApp(L.app,L.act);
+  dlg.innerHTML=`<div><h3>${esc(g.name).toUpperCase()} // ${L.app}</h3>
+   <p class="dim" style="margin-bottom:12px">How long? It's saved as a ${L.app==='MIND'?'session in MIND':'study session in LEARN'}, so it shows there and ticks off here.</p>
+   <div class="chips">${[5,10,15,20,30,45,60].map(m=>`<button type="button" data-m="${m}">${m} MIN</button>`).join('')}</div>
+   <div class="fa2" style="margin-top:14px"><button type="button" data-a="x">CANCEL</button><button type="button" id="lo">OPEN ${L.app} INSTEAD</button></div></div>`;
+  dlg.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{logTo(k,+b.dataset.m);dlg.close();render();toast(`${g.name} ✓ · ${b.dataset.m} min added to ${L.app}`)});
+  $('#lo').onclick=()=>{dlg.close();openApp(L.app,L.app==='MIND'?'go':'startnext')};
+  dlg.showModal();
+}
 function appRows(a){try{const r=APPS[a].rows(JSON.parse(localStorage.getItem(APPS[a].key)));return Array.isArray(r)?r:null}catch(e){return null}}
 // completions pulled from the other apps, shaped like 'done' entries
 function linked(){
@@ -378,7 +408,7 @@ function today(){
   const good=S.good.map(g=>{const n=L.filter(e=>isDone(e)&&e.g===g.name).length,tg=g.target||1;
     const lk=LINKS[g.link],none=lk&&!appRows(lk.app);
     return `<div class="trow"><div><b class="${n>=tg?'pos':''}">${esc(g.name)}</b><div class="dim">${n} / ${tg} today${n>=tg?' ✓':''}${lk?` · <span class="amb">via ${lk.app}</span>${none?' (no data here yet)':''}`:''}</div></div>
-     <span class="tb">${lk?`<a class="btn" href="${appUrl(lk.app)}" target="_blank" rel="noopener" data-app="${lk.app}">OPEN</a>`:''}<button data-a="done" data-v="${esc(g.name)}">+ DONE</button></span></div>`}).join('');
+     <span class="tb">${!lk?`<button data-a="done" data-v="${esc(g.name)}">+ DONE</button>`:quickLog(g.link)?`<a class="btn" href="${appUrl(lk.app)}" target="_blank" rel="noopener" data-app="${lk.app}">OPEN</a><button data-a="done" data-v="${esc(g.name)}">+ DONE</button>`:`<button data-a="done" data-v="${esc(g.name)}">LOG IN ${lk.app}</button>`}</span></div>`}).join('');
   return `<div class="card"><p class="h">Today</p>
    <div class="sec first">Breaking</div>${bad||'<p class="dim">No habit to break yet_</p>'}
    <div class="sec">Building</div>${good||'<p class="dim">No good habits yet_</p>'}
@@ -647,6 +677,8 @@ function entryForm(t){
     ev.preventDefault();const ty=e.t.value,v={t:ty,at:new Date(e.when.value).getTime(),note:e.note.value.trim()};
     if(ty!=='done'){if(!e.b.value){$('#pv').innerHTML='<b class="neg">Add a habit to break first</b>';return}
       v.b=e.b.value;v.int=e.int.value===''?null:Math.min(10,Math.max(1,+e.int.value));v.trig=e.trig.value||null}
+    const lg=LINKS[S.good.find(x=>x.name===e.g.value)?.link];
+    if(ty==='done'&&lg&&!(t&&t.g===e.g.value)){$('#pv').innerHTML=`<b class="amb">Log ${esc(e.g.value)} in ${lg.app}: it ticks off here by itself</b>`;return}
     if(ty!=='slip'&&e.g.value)v.g=e.g.value;
     if(ty==='done'&&!v.g){$('#pv').innerHTML='<b class="neg">Pick the good habit</b>';return}
     if(t){const o=S.log.find(x=>x.id===t.id);['b','g','int','trig'].forEach(k=>delete o[k]);Object.assign(o,v)}else S.log.push({id:uid(),...v});
@@ -693,7 +725,8 @@ function sample(){
 const ACT={
   urge:v=>R?draw():urgeForm(v),add:()=>entryForm(),habits:()=>habitsForm(),pick:v=>habitsForm(v),x:()=>dlg.close(),sample,csv:exportCSV,
   note:()=>noteForm(U.range in RANGES?ymd(new Date()):U.range),imp:()=>$('#file').click(),
-  done:v=>{S.log.push({id:uid(),at:Date.now(),t:'done',g:v,note:''});save();render();toast(`${v} ✓`)},
+  done:v=>{const g=S.good.find(x=>x.name===v);if(g&&LINKS[g.link])return linkedDone(g);
+    S.log.push({id:uid(),at:Date.now(),t:'done',g:v,note:''});save();render();toast(`${v} ✓`)},
   bak:()=>dl(`rewire-backup-${ymd(new Date())}.json`,JSON.stringify(S),'application/json'),
   clear:()=>{if(confirm('Delete ALL habits, entries and notes on this device?')){S={bad:[],good:[],log:[],notes:{}};save();U.range='all';U.h='all';boot()}},
   prev:()=>shift(-1),next:()=>shift(1),tod:()=>{setMonth(Date.now());render()},
