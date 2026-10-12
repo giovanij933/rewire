@@ -1,5 +1,7 @@
 // Bump the version string whenever you change index.html so clients pick up the new shell.
-const CACHE = 'isx-rewire-v2';
+const CACHE = 'isx-rewire-v3';
+// all ISIONXXX apps share one site and one cache storage: only ever clear this app's own old caches
+const MINE = k => k.startsWith('isx-rewire-');
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './sync.js'];
 
 self.addEventListener('install', e => {
@@ -10,7 +12,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => MINE(k) && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
