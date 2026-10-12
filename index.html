@@ -173,7 +173,7 @@ fieldset{border:1px solid var(--line);padding:12px;margin:0 0 12px;min-width:0}
 legend{color:var(--amber);font-size:11px;letter-spacing:.14em;padding:0 6px}
 fieldset>label{margin-bottom:10px}
 .pair{display:flex;gap:6px}.pair input{flex:1;min-width:0}.pair select{width:auto!important}
-.grow{display:flex;gap:6px;margin-bottom:6px}.grow input[name=gn]{flex:1;min-width:0}.grow input[name=gt]{width:64px}
+.grow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.grow select[name=gl]{flex:1 0 100%;font-size:12px;color:var(--dim)}.grow input[name=gn]{flex:1;min-width:0}.grow input[name=gt]{width:64px}
 #hf>button{width:100%;margin-bottom:12px}
 .empty .chips{margin:10px 0 12px}
 </style>
@@ -214,17 +214,35 @@ const APPS={
 };
 // good habits that tick themselves off when you log in another app; day:1 = counts once per day
 const LINKS={
-  meditate:{app:'MIND',name:'Meditate',f:e=>e.kind==='M',kind:'M'},
-  breathwork:{app:'MIND',name:'Breathwork',f:e=>e.kind==='B',kind:'B'},
-  mjournal:{app:'MIND',name:'Journal',f:e=>e.kind==='J',kind:'J'},
-  mind:{app:'MIND',name:'Mind session',kind:'M'},
+  meditate:{app:'MIND',name:'Meditate',f:e=>e.kind==='M',kind:'M',q:'min'},
+  breathwork:{app:'MIND',name:'Breathwork',f:e=>e.kind==='B',kind:'B',q:'min'},
+  mjournal:{app:'MIND',name:'Journal',f:e=>e.kind==='J',kind:'J',q:'min'},
+  mind:{app:'MIND',name:'Mind session',kind:'M',q:'min'},
+  // g.ex = which exercise (Walk, Run, Push-up…); these log straight into TRAINING
+  cardio:{app:'TRAINING',name:'Cardio',f:(e,g)=>e.type==='C'&&(!g.ex||e.ex===g.ex),q:'min'},
+  reps:{app:'TRAINING',name:'Bodyweight reps',f:(e,g)=>e.type==='B'&&e.ex===g.ex,q:'reps',hide:1},
   workout:{app:'TRAINING',name:'Workout',f:e=>e.type!=='S',day:1,act:'go'},
   stretch:{app:'TRAINING',name:'Stretch',f:e=>e.type==='S',day:1,act:'go'},
   meals:{app:'NUTRITION',name:'Log meals',act:'quick'},
   bowl:{app:'NUTRITION',name:'Eat the balanced bowl',f:e=>e.kind==='bowl',act:'cook'},
-  study:{app:'LEARN',name:'Study session'},
+  study:{app:'LEARN',name:'Study session',q:'min'},
   trades:{app:'JOURNAL',name:'Review trades',day:1,act:'add'}
 };
+// which app a good habit belongs to, from its name. Order matters: "Trading journal" is JOURNAL, not MIND.
+const GUESS=[[/trade|trading|backtest/i,{link:'trades'}],[/meditat/i,{link:'meditate'}],[/breath/i,{link:'breathwork'}],[/journal/i,{link:'mjournal'}],
+  [/stretch|yoga|mobility/i,{link:'stretch'}],[/push-?\s?ups?/i,{link:'reps',ex:'Push-up'}],[/pull-?\s?ups?/i,{link:'reps',ex:'Pull-up'}],[/\bdips?\b/i,{link:'reps',ex:'Dip'}],
+  [/walk/i,{link:'cardio',ex:'Walk'}],[/\b(run|jog)/i,{link:'cardio',ex:'Run'}],[/hike/i,{link:'cardio',ex:'Hike'}],[/bike|cycl/i,{link:'cardio',ex:'Bike'}],
+  [/swim/i,{link:'cardio',ex:'Swim'}],[/jump rope/i,{link:'cardio',ex:'Jump Rope'}],[/cardio/i,{link:'cardio'}],[/workout|gym|lift/i,{link:'workout'}],
+  [/\b(meals?|eat|food|cook|breakfast|lunch|dinner|fruit|veg)/i,{link:'meals'}],[/study|lesson|course|\bsql\b|python|tableau|\bsas\b|learn/i,{link:'study'}]];
+const guess=n=>(GUESS.find(([r])=>r.test(n||''))||[])[1]||null;
+// the amount in a habit's name: "Walk 10 min" = 10 minutes, "20 push-ups" = 20 reps
+const amountIn=(n,q)=>{const m=q==='min'?/(\d+)\s*(?:min|minutes?)\b/i.exec(n):/(\d+)/.exec(n);return m?+m[1]:null};
+// every place a habit can log, for the HABITS editor (value = link or link:exercise)
+const TARGETS=[['','REWIRE only'],['meditate','MIND · Meditate'],['breathwork','MIND · Breathwork'],['mjournal','MIND · Journal'],['mind','MIND · Any session'],
+  ['workout','TRAINING · Workout'],['stretch','TRAINING · Stretch'],['cardio:Walk','TRAINING · Walk'],['cardio:Run','TRAINING · Run'],['cardio:Bike','TRAINING · Bike'],
+  ['cardio:Hike','TRAINING · Hike'],['cardio:Swim','TRAINING · Swim'],['cardio','TRAINING · Any cardio'],['reps:Push-up','TRAINING · Push-ups'],['reps:Pull-up','TRAINING · Pull-ups'],
+  ['reps:Dip','TRAINING · Dips'],['meals','NUTRITION · Log meals'],['bowl','NUTRITION · Balanced bowl'],['study','LEARN · Study'],['trades','JOURNAL · Review trades']];
+const tval=g=>g.link?g.link+(g.ex?':'+g.ex:''):'';
 // on GitHub Pages the apps sit side by side; anywhere else, point at the published copies
 const BASE=/github\.io$/.test(location.hostname)?location.origin+'/':'https://giovanij933.github.io/';
 const appUrl=a=>BASE+APPS[a].repo+'/';
@@ -235,30 +253,42 @@ function openApp(a,act){if(embedded)parent.postMessage({isx:'open',app:a.toLower
 /* A linked good habit is saved in the app it belongs to, never only here: then MIND, TRAINING, NUTRITION, LEARN,
    JOURNAL, REWIRE and TODAY all show the same thing, and deleting it there removes it here too.
    MIND and LEARN entries are just time, so they're written straight from here; the rest need that app's form. */
-const quickLog=k=>{const a=LINKS[k]?.app;return a==='MIND'||a==='LEARN'};
-function logTo(k,mins){
-  const L=LINKS[k],at=Date.now()-mins*6e4;
+const quickLog=k=>!!LINKS[k]?.q;
+const rw=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}};
+// amt = minutes, or reps for bodyweight. id/at are given when moving an old REWIRE entry, so every device moves it the same way.
+function logTo(g,amt,at=Date.now(),id=uid()){
+  const L=LINKS[g.link],note='Logged from REWIRE';
   if(L.app==='MIND'){
-    let s;try{s=JSON.parse(localStorage.getItem('isx.mind.v1'))}catch(e){}
-    if(!s||!Array.isArray(s.log))s={...(s||{}),log:[],notes:s?.notes||{}};
-    s.log.push({id:uid(),at,kind:L.kind,tech:'',mins,pre:null,post:null,depth:null,note:'Logged from REWIRE'});
+    const s=rw('isx.mind.v1',{});if(!Array.isArray(s.log)){s.log=[];s.notes??={}}
+    if(s.log.some(e=>e.id===id))return;
+    s.log.push({id,at,kind:L.kind,tech:'',mins:amt,pre:null,post:null,depth:null,note});
     localStorage.setItem('isx.mind.v1',JSON.stringify(s));
   }else if(L.app==='LEARN'){
-    let a;try{a=JSON.parse(localStorage.getItem('xl.sessions.v1'))}catch(e){}
-    if(!Array.isArray(a))a=[];
-    a.push({id:uid(),time:new Date(at).toISOString(),min:mins,lessons:[],tracks:[]});
+    const a=arr(rw('xl.sessions.v1',[]));if(a.some(e=>e.id===id))return;
+    a.push({id,time:new Date(at).toISOString(),min:amt,lessons:[],tracks:[]});
     localStorage.setItem('xl.sessions.v1',JSON.stringify(a));
+  }else if(L.app==='TRAINING'){
+    const s=rw('isx.training.v1',{});if(!Array.isArray(s.log)){s.log=[];s.notes??={}}
+    if(s.log.some(e=>e.id===id))return;
+    const c=g.link==='cardio';
+    s.log.push({id,at,ex:g.ex||'Walk',type:c?'C':'B',sets:c?0:1,reps:c?0:amt,load:0,dist:0,mins:c?amt:0,rpe:null,note});
+    localStorage.setItem('isx.training.v1',JSON.stringify(s));
   }
 }
+const arr=x=>Array.isArray(x)?x:[];
 function linkedDone(g){
-  const k=g.link,L=LINKS[k];
+  const k=g.link,L=LINKS[k],unit=L.q==='reps'?'reps':'min',what=g.ex?`${g.ex} ${unit==='reps'?'reps':'session'}`:L.app==='MIND'?'session':L.app==='LEARN'?'study session':'session';
   if(!quickLog(k))return openApp(L.app,L.act);
+  const done=n=>{logTo(g,n);dlg.open&&dlg.close();render();toast(`${g.name} ✓ · ${n} ${unit} logged in ${L.app}`)};
+  // the name already says how much ("Walk 10 min", "20 push-ups"): one tap
+  const n=amountIn(g.name,L.q);if(n)return done(n);
+  const opts=unit==='reps'?[5,10,15,20,25,30,50]:[5,10,15,20,30,45,60];
   dlg.innerHTML=`<div><h3>${esc(g.name).toUpperCase()} // ${L.app}</h3>
-   <p class="dim" style="margin-bottom:12px">How long? It's saved as a ${L.app==='MIND'?'session in MIND':'study session in LEARN'}, so it shows there and ticks off here.</p>
-   <div class="chips">${[5,10,15,20,30,45,60].map(m=>`<button type="button" data-m="${m}">${m} MIN</button>`).join('')}</div>
+   <p class="dim" style="margin-bottom:12px">How ${unit==='reps'?'many':'long'}? It's saved as a ${what} in ${L.app}, so it shows there and ticks off here.</p>
+   <div class="chips">${opts.map(m=>`<button type="button" data-m="${m}">${m} ${unit.toUpperCase()}</button>`).join('')}</div>
    <div class="fa2" style="margin-top:14px"><button type="button" data-a="x">CANCEL</button><button type="button" id="lo">OPEN ${L.app} INSTEAD</button></div></div>`;
-  dlg.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{logTo(k,+b.dataset.m);dlg.close();render();toast(`${g.name} ✓ · ${b.dataset.m} min added to ${L.app}`)});
-  $('#lo').onclick=()=>{dlg.close();openApp(L.app,L.app==='MIND'?'go':'startnext')};
+  dlg.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>done(+b.dataset.m));
+  $('#lo').onclick=()=>{dlg.close();openApp(L.app,{MIND:'go',LEARN:'startnext',TRAINING:'go'}[L.app])};
   dlg.showModal();
 }
 function appRows(a){try{const r=APPS[a].rows(JSON.parse(localStorage.getItem(APPS[a].key)));return Array.isArray(r)?r:null}catch(e){return null}}
@@ -268,10 +298,10 @@ function linked(){
   S.good.forEach(g=>{
     const L=LINKS[g.link];if(!L)return;
     const rows=cache[L.app]??=appRows(L.app)||[],seen=new Set();
-    rows.filter(e=>!L.f||L.f(e)).forEach(e=>{
+    rows.filter(e=>!L.f||L.f(e,g)).forEach(e=>{
       const at=APPS[L.app].at(e);if(!isFinite(at))return;
       const day=ymd(new Date(at));if(L.day){if(seen.has(day))return;seen.add(day)}
-      out.push({id:'lk-'+g.link+'-'+at,at,t:'done',g:g.name,src:L.app,ro:1,note:''});
+      out.push({id:'lk-'+g.link+(g.ex||'')+'-'+at,at,t:'done',g:g.name,src:L.app,ro:1,note:''});
     });
   });
   return out;
@@ -309,7 +339,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 let S=load();
 const U={h:'all',range:'all',page:0,month:null};
 function load(){
-  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.log))return {bad:s.bad||[],good:s.good||[],log:s.log,notes:s.notes||{}}}catch(e){}
+  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.log))return {bad:s.bad||[],good:s.good||[],log:s.log,notes:s.notes||{},lv:s.lv||0}}catch(e){}
   return {bad:[],good:[],log:[],notes:{}};
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Storage write failed — take a backup')}}
@@ -501,9 +531,10 @@ function habitsForm(pick){
     </fieldset>`).join('')}
     <button type="button" id="ab">+ ANOTHER HABIT TO BREAK</button>
     <fieldset><legend>BUILD</legend>
-     ${G.map((g,i)=>`<div class="grow" data-g="${i}"><input name="gn" value="${esc(g.name)}" aria-label="Good habit">${LINKS[g.link]?`<span class="tag">${LINKS[g.link].app}</span>`:''}<input name="gt" type="number" min="1" step="1" value="${g.target||1}" aria-label="Times per day" title="Times per day"><button type="button" data-gx="${i}" aria-label="Remove">X</button></div>`).join('')||'<p class="dim">No good habits yet_</p>'}
+     ${G.map((g,i)=>`<div class="grow" data-g="${i}"><input name="gn" value="${esc(g.name)}" aria-label="Good habit"><input name="gt" type="number" min="1" step="1" value="${g.target||1}" aria-label="Times per day" title="Times per day"><button type="button" data-gx="${i}" aria-label="Remove">X</button>
+       <select name="gl" aria-label="Logs in">${[...TARGETS,...(TARGETS.some(t=>t[0]===tval(g))?[]:[[tval(g),`${LINKS[g.link]?.app||''} · ${g.ex||LINKS[g.link]?.name||''}`]])].map(([v,l])=>`<option value="${esc(v)}"${v===tval(g)?' selected':''}>Logs in: ${esc(l)}</option>`).join('')}</select></div>`).join('')||'<p class="dim">No good habits yet_</p>'}
      <span class="k">Linked to your apps — ticks itself off when you log there</span>
-     <div class="chips">${Object.entries(LINKS).filter(([k])=>!G.some(g=>g.link===k)).map(([k,l])=>`<button type="button" data-link="${k}">+ ${esc(l.name)} <span class="dim">· ${l.app}</span></button>`).join('')}</div>
+     <div class="chips">${Object.entries(LINKS).filter(([k,l])=>!l.hide&&!G.some(g=>g.link===k)).map(([k,l])=>`<button type="button" data-link="${k}">+ ${esc(l.name)} <span class="dim">· ${l.app}</span></button>`).join('')}</div>
      <span class="k">Other good habits</span>
      <div class="chips">${GOOD.filter(n=>!G.some(g=>g.name===n)).map(n=>`<button type="button" data-add="${esc(n)}">+ ${esc(n)}</button>`).join('')}<input id="gnew" placeholder="Your own" aria-label="Your own good habit" style="width:150px"><button type="button" id="gadd">ADD</button></div>
      <p class="dim">The number next to each one is how many times a day you aim for.</p>
@@ -515,9 +546,10 @@ function habitsForm(pick){
       f.querySelectorAll('fieldset[data-i]').forEach(fs=>{const b=B[+fs.dataset.i],q=n=>fs.querySelector(`[name=${n}]`).value;
         b.name=q('name').trim();b.why=q('why').trim();b.cost=q('cost');b.unit=q('unit');b.goal=Math.max(1,Math.round(+q('goal'))||30);
         const d=q('start');if(d)b.start=pd(d).getTime()});
-      f.querySelectorAll('.grow').forEach(r=>{const g=G[+r.dataset.g];g.name=r.querySelector('[name=gn]').value.trim();g.target=Math.max(1,Math.round(+r.querySelector('[name=gt]').value)||1)});
+      f.querySelectorAll('.grow').forEach(r=>{const g=G[+r.dataset.g];g.name=r.querySelector('[name=gn]').value.trim();g.target=Math.max(1,Math.round(+r.querySelector('[name=gt]').value)||1);
+        const [l,x]=r.querySelector('[name=gl]').value.split(':');if(l){g.link=l;if(x)g.ex=x;else delete g.ex}else{delete g.link;delete g.ex}});
     };
-    const add=n=>{n=n.trim();if(n&&!G.some(g=>g.name.toLowerCase()===n.toLowerCase()))G.push({name:n,target:1})};
+    const add=n=>{n=n.trim();if(n&&!G.some(g=>g.name.toLowerCase()===n.toLowerCase()))G.push({name:n,target:1,...guess(n)})};
     f.onclick=ev=>{
       const t=ev.target.closest('button');if(!t||t.type==='submit'||t.dataset.a)return;sync();
       if(t.dataset.rep!=null){const b=B[+t.closest('fieldset').dataset.i],r=t.dataset.rep;b.reps=b.reps.includes(r)?b.reps.filter(x=>x!==r):[...b.reps,r];add(r)}
@@ -707,6 +739,7 @@ function sample(){
   const now=new Date(),id=uid(),at=(ago,h,m)=>new Date(now.getFullYear(),now.getMonth(),now.getDate()-ago,h,m).getTime();
   S.bad=[{id,name:'Doomscrolling',why:'Sleep earlier and actually finish books.',cost:20,unit:'min',goal:30,start:at(27,8,0),reps:['Read 5 pages','Walk 10 min','Breathing reset']}];
   S.good=[{name:'Read 5 pages',target:1},{name:'Walk 10 min',target:1},{name:'Breathing reset',target:2},{name:'Drink water',target:3},{name:'Meditate',target:1,link:'meditate'},{name:'Workout',target:1,link:'workout'}];
+  S.good.forEach(g=>{if(!g.link)Object.assign(g,guess(g.name)||{})});S.lv=2;   // sample ticks stay here: never write demo data into the other apps
   const T=['Boredom','Late night','Phone in hand','Work break','Tired','Stress'];
   for(let ago=27;ago>=0;ago--){
     const n=ago>18?4:ago>9?3:2;
@@ -751,7 +784,21 @@ $('#file').addEventListener('change',async e=>{
   }catch(x){toast('Not a valid backup file')}
 });
 
-function boot(){setMonth(S.log.length?Math.max(...S.log.map(t=>t.at)):Date.now());render()}
+/* Once per device: give each good habit the app it belongs to (from its name), and move old ticks of those habits
+   into that app when the amount is known ("Walk 10 min"). Ids are derived from the old entry, so two devices doing
+   this end up with the same entries, and sync merges them instead of doubling up. */
+function linkAll(){
+  if(S.lv>=2)return;
+  S.good.forEach(g=>{if(!g.link){const m=guess(g.name);if(m)Object.assign(g,m)}});
+  const moved=new Set();
+  S.log.forEach(e=>{
+    if(e.t!=='done'||e.src)return;const g=S.good.find(x=>x.name===e.g),L=g&&LINKS[g.link];
+    if(!L||!L.q)return;const n=amountIn(g.name,L.q);if(!n)return;
+    logTo(g,n,e.at,'rw-'+e.id);moved.add(e.id);
+  });
+  S.log=S.log.filter(e=>!moved.has(e.id));S.lv=2;save();
+}
+function boot(){linkAll();setMonth(S.log.length?Math.max(...S.log.map(t=>t.at)):Date.now());render()}
 boot();
 if(R)draw();
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
