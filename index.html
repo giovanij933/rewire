@@ -208,8 +208,8 @@ const TRIG=['Boredom','Stress','Tired','Lonely','Anxious','Phone in hand','After
 const APPS={
   MIND:{repo:'MEDITATE',key:'isx.mind.v1',rows:s=>s?.log,at:e=>e.at},
   TRAINING:{repo:'TRAINING',key:'isx.training.v1',rows:s=>s?.log,at:e=>e.at},
-  FUEL:{repo:'nutrition',key:'nj.meals.v1',rows:s=>s,at:e=>Date.parse(e.time)},
-  EXTRACT:{repo:'data-analytics',key:'xl.sessions.v1',rows:s=>s,at:e=>Date.parse(e.time)},
+  NUTRITION:{repo:'nutrition',key:'nj.meals.v1',rows:s=>s,at:e=>Date.parse(e.time)},
+  LEARN:{repo:'data-analytics',key:'xl.sessions.v1',rows:s=>s,at:e=>Date.parse(e.time)},
   JOURNAL:{repo:'JOURNAL',key:'isx.journal.v1',rows:s=>s?.trades,at:e=>e.close}
 };
 // good habits that tick themselves off when you log in another app; day:1 = counts once per day
@@ -220,9 +220,9 @@ const LINKS={
   mind:{app:'MIND',name:'Mind session'},
   workout:{app:'TRAINING',name:'Workout',f:e=>e.type!=='S',day:1},
   stretch:{app:'TRAINING',name:'Stretch',f:e=>e.type==='S',day:1},
-  meals:{app:'FUEL',name:'Log meals'},
-  bowl:{app:'FUEL',name:'Eat the balanced bowl',f:e=>e.kind==='bowl'},
-  study:{app:'EXTRACT',name:'Study session'},
+  meals:{app:'NUTRITION',name:'Log meals'},
+  bowl:{app:'NUTRITION',name:'Eat the balanced bowl',f:e=>e.kind==='bowl'},
+  study:{app:'LEARN',name:'Study session'},
   trades:{app:'JOURNAL',name:'Review trades',day:1}
 };
 // on GitHub Pages the apps sit side by side; anywhere else, point at the published copies
@@ -413,7 +413,7 @@ function render(){
   const dk=s.dk,hoursMax=Math.max(...s.hours),danger=hoursMax?s.hours.indexOf(hoursMax):null;
   const hr=h=>h==null?'—':new Date(2000,0,1,h).toLocaleTimeString('en-US',{hour:'numeric'});
 
-  $('#app').innerHTML=`${S.bad.length?'':`<div class="card empty"><p class="h">What do you want to break?</p><p class="dim">Name the habit, then choose the good habits that replace it. Good habits can link to MIND, TRAINING, FUEL, EXTRACT and JOURNAL and tick themselves off when you log there.</p>
+  $('#app').innerHTML=`${S.bad.length?'':`<div class="card empty"><p class="h">What do you want to break?</p><p class="dim">Name the habit, then choose the good habits that replace it. Good habits can link to MIND, TRAINING, NUTRITION, LEARN and JOURNAL and tick themselves off when you log there.</p>
    <form id="ob" class="chips"><input name="n" required autocomplete="off" placeholder="The habit to break" aria-label="The habit to break" style="flex:1;min-width:200px;width:auto"><button class="pri">START</button><button type="button" data-a="sample">LOAD SAMPLE</button></form></div>`}
 <section class="g g4">
  <div class="card"><p class="h">Clean streak</p><div class="k">Since last slip</div><div class="big pos">${S.bad.length?span(st.cur):'—'}</div>
