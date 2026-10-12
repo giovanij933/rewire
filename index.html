@@ -407,7 +407,7 @@ function render(){
   const t=ymd(new Date()),tgt=S.good.reduce((a,g)=>a+(g.target||1),0),dn=S.log.filter(e=>isDone(e)&&ymd(new Date(e.at))===t).length;
   $('[data-f=h]').innerHTML='<option value="all">All habits</option>'+S.bad.map(b=>`<option value="${b.id}"${b.id===U.h?' selected':''}>${esc(b.name)}</option>`).join('');
   $('[data-f=range]').innerHTML=Object.entries(RANGES).map(([k,v])=>`<option value="${k}"${k===U.range?' selected':''}>${v}</option>`).join('')+(U.range in RANGES?'':`<option value="${U.range}" selected>${dlabel(U.range)}</option>`);
-  $('#scope').textContent=`Statistics for ${U.h==='all'?'All Habits':badOf(U.h).name} — ${RANGES[U.range]||dlabel(U.range)}`;
+  $('#scope').textContent=`Statistics for ${U.h==='all'?'All Habits':badOf(U.h).name} — ${RANGES[U.range]||dlabel(U.range)}`+(s.dk.length?` · ${dlabel(s.dk[0])} → ${dlabel(s.dk[s.dk.length-1])}`:'');
   const sv=[s.saved.$?money(s.saved.$,'$'):'',s.saved.min?money(s.saved.min,'min'):''].filter(Boolean).join(' + ')||'—';
   const trend=s.early!=null&&s.late!=null&&s.urges>=4?s.late-s.early:null;
   const dk=s.dk,hoursMax=Math.max(...s.hours),danger=hoursMax?s.hours.indexOf(hoursMax):null;
@@ -447,7 +447,7 @@ function render(){
 </section>
 ${table(T)}
 <footer><p>Urges rise, peak and pass, usually within minutes. Surf them, swap in a good habit, and the old loop weakens each time. If a habit involves alcohol, drugs or gambling and feels out of your control, talk to a doctor or a support line — stopping some substances suddenly needs medical help.</p>
- Data lives on this device only <button data-a="bak">BACKUP JSON</button><button data-a="imp">RESTORE</button><button data-a="clear">CLEAR ALL</button></footer>`;
+ Saved on this device · SYNC shares it across your devices <button data-a="bak">BACKUP JSON</button><button data-a="imp">RESTORE</button><button data-a="clear">CLEAR ALL</button></footer>`;
 }
 
 /* ---------- habits setup ---------- */
