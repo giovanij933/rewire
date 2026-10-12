@@ -228,6 +228,9 @@ const LINKS={
 // on GitHub Pages the apps sit side by side; anywhere else, point at the published copies
 const BASE=/github\.io$/.test(location.hostname)?location.origin+'/':'https://giovanij933.github.io/';
 const appUrl=a=>BASE+APPS[a].repo+'/';
+// inside the ISIONXXX app the others are tabs: ask it to switch instead of opening a new window
+const embedded=window.parent!==window;
+function openApp(a){if(embedded)parent.postMessage({isx:'open',app:a.toLowerCase()},location.origin);else window.open(appUrl(a),'_blank','noopener')}
 function appRows(a){try{const r=APPS[a].rows(JSON.parse(localStorage.getItem(APPS[a].key)));return Array.isArray(r)?r:null}catch(e){return null}}
 // completions pulled from the other apps, shaped like 'done' entries
 function linked(){
@@ -375,7 +378,7 @@ function today(){
   const good=S.good.map(g=>{const n=L.filter(e=>isDone(e)&&e.g===g.name).length,tg=g.target||1;
     const lk=LINKS[g.link],none=lk&&!appRows(lk.app);
     return `<div class="trow"><div><b class="${n>=tg?'pos':''}">${esc(g.name)}</b><div class="dim">${n} / ${tg} today${n>=tg?' ✓':''}${lk?` · <span class="amb">via ${lk.app}</span>${none?' (no data here yet)':''}`:''}</div></div>
-     <span class="tb">${lk?`<a class="btn" href="${appUrl(lk.app)}" target="_blank" rel="noopener">OPEN</a>`:''}<button data-a="done" data-v="${esc(g.name)}">+ DONE</button></span></div>`}).join('');
+     <span class="tb">${lk?`<a class="btn" href="${appUrl(lk.app)}" target="_blank" rel="noopener" data-app="${lk.app}">OPEN</a>`:''}<button data-a="done" data-v="${esc(g.name)}">+ DONE</button></span></div>`}).join('');
   return `<div class="card"><p class="h">Today</p>
    <div class="sec first">Breaking</div>${bad||'<p class="dim">No habit to break yet_</p>'}
    <div class="sec">Building</div>${good||'<p class="dim">No good habits yet_</p>'}
@@ -390,7 +393,7 @@ function table(T){
    <td>${tfmt(e.at)}</td><td>${what(e)}</td><td>${e.b?esc(badOf(e.b)?.name||'—'):na}</td><td>${e.g?esc(e.g):na}</td>
    <td class="r">${e.int??na}</td><td class="dim">${esc(e.trig)||'—'}</td>
    <td class="dim" title="${esc(e.note)}">${esc((e.note||'').length>40?e.note.slice(0,39)+'…':e.note||'')}</td>
-   <td class="r">${e.ro?`<a class="btn sm" href="${appUrl(e.src)}" target="_blank" rel="noopener">${e.src}</a>`:`<button data-a="edit" data-v="${e.id}">EDIT</button> <button data-a="del" data-v="${e.id}" aria-label="Delete entry">X</button>`}</td></tr>`).join('');
+   <td class="r">${e.ro?`<a class="btn sm" href="${appUrl(e.src)}" target="_blank" rel="noopener" data-app="${e.src}">${e.src}</a>`:`<button data-a="edit" data-v="${e.id}">EDIT</button> <button data-a="del" data-v="${e.id}" aria-label="Delete entry">X</button>`}</td></tr>`).join('');
   return `<div class="card"><div class="rowh"><p class="h">Log</p><button data-a="csv">EXPORT CSV</button></div>
   <div class="tw"><table><thead><tr><th>Time (local)</th><th>Event</th><th>Breaking</th><th>Good habit</th><th class="r">Urge</th><th>Trigger</th><th>Note</th><th></th></tr></thead>
   <tbody>${body||'<tr><td colspan="8" class="dim">Nothing in this view_</td></tr>'}</tbody></table></div>
@@ -612,7 +615,7 @@ function outcomeForm(){
   const lkOf=n=>LINKS[S.good.find(g=>g.name===n)?.link];
   const oo=$('#oo'),syncO=()=>{if(!oo)return;const l=lkOf(cval('rep'));oo.hidden=!l;if(l)oo.textContent=`SAVE & OPEN ${l.app}`};
   f.addEventListener('input',syncO);syncO();
-  oo&&(oo.onclick=()=>{const l=lkOf(cval('rep'));f.requestSubmit();if(l)window.open(appUrl(l.app),'_blank','noopener')});
+  oo&&(oo.onclick=()=>{const l=lkOf(cval('rep'));f.requestSubmit();if(l)openApp(l.app)});
   f.onsubmit=ev=>{
     ev.preventDefault();
     const e={id:uid(),at:R.t0,t:R.slipped?'slip':'resist',b:R.b,int:R.int??rval('int'),trig:R.trig??cval('trig'),note:f.elements.note.value.trim()};
@@ -701,6 +704,9 @@ const ACT={
 };
 function shift(k){const d=new Date(U.month.y,U.month.m+k,1);U.month={y:d.getFullYear(),m:d.getMonth()};render()}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b&&ACT[b.dataset.a])ACT[b.dataset.a](b.dataset.v)});
+document.addEventListener('click',e=>{const a=e.target.closest('a[data-app]');if(a&&embedded){e.preventDefault();openApp(a.dataset.app)}});
+// another app (or tab) logged something: refresh the linked ticks
+addEventListener('storage',e=>{if(e.key===KEY){S=load();render()}else if(Object.values(APPS).some(a=>a.key===e.key))render()});
 document.addEventListener('submit',e=>{if(e.target.id!=='ob')return;e.preventDefault();habitsForm(e.target.elements.n.value.trim())});
 document.addEventListener('change',e=>{const k=e.target.dataset.f;if(!k)return;U[k]=e.target.value;U.page=0;render()});
 $('#file').addEventListener('change',async e=>{
