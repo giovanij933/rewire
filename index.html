@@ -157,6 +157,7 @@ label.ck input{width:auto}
 }
 .bga{background:var(--amber)}
 .tb{display:flex;gap:6px;flex:none}
+.dd{font-size:11.5px;color:var(--tx);margin-top:3px}.dd::first-letter{color:var(--green)}.sm{font-size:11px;margin-top:2px}
 a.btn{display:inline-block;border:1px solid var(--line2);padding:7px 10px;font-size:12px;letter-spacing:.06em;color:var(--tx);text-decoration:none}
 a.btn:hover{border-color:var(--amber);color:var(--amber)}
 a.btn.sm{padding:2px 7px;font-size:11px}
@@ -206,11 +207,17 @@ const RANGES={today:'Today',week:'This week',month:'This month',all:'All time'};
 const TRIG=['Boredom','Stress','Tired','Lonely','Anxious','Phone in hand','After a meal','Social','Celebrating','Work break','Late night','Other'];
 // the other ISIONXXX apps share this site, so their logs can be read here (read-only)
 const APPS={
-  MIND:{repo:'MEDITATE',key:'isx.mind.v1',rows:s=>s?.log,at:e=>e.at},
-  TRAINING:{repo:'TRAINING',key:'isx.training.v1',rows:s=>s?.log,at:e=>e.at},
-  NUTRITION:{repo:'nutrition',key:'nj.meals.v1',rows:s=>s,at:e=>Date.parse(e.time)},
-  LEARN:{repo:'data-analytics',key:'xl.sessions.v1',rows:s=>s,at:e=>Date.parse(e.time)},
-  JOURNAL:{repo:'JOURNAL',key:'isx.journal.v1',rows:s=>s?.trades,at:e=>e.close}
+  MIND:{repo:'MEDITATE',key:'isx.mind.v1',rows:s=>s?.log,at:e=>e.at,
+    det:e=>[e.mins?`${e.mins} min`:'',e.tech,e.pre!=null&&e.post!=null?`mood ${e.pre}→${e.post}`:'']},
+  TRAINING:{repo:'TRAINING',key:'isx.training.v1',rows:s=>s?.log,at:e=>e.at,
+    det:(e,s)=>e.type==='C'?[e.ex,e.mins?`${e.mins} min`:'',e.dist?`${e.dist} ${s?.du||'mi'}`:'',e.rpe?`RPE ${e.rpe}`:'']
+      :[e.ex,e.type==='W'?`${e.sets}×${e.reps} @ ${e.load} ${s?.wu||'lb'}`:e.type==='S'?`${e.sets}×${e.reps}s hold`:`${e.sets}×${e.reps}`,e.rpe?`RPE ${e.rpe}`:'']},
+  NUTRITION:{repo:'nutrition',key:'nj.meals.v1',rows:s=>s,at:e=>Date.parse(e.time),
+    det:e=>[e.kind==='bowl'?`Bowl${e.servings>1?' ×'+e.servings:''}${e.protein?' · '+e.protein:''}`:e.name,e.kind==='quick'&&e.kcal?`${Math.round(e.kcal)} kcal`:'']},
+  LEARN:{repo:'data-analytics',key:'xl.sessions.v1',rows:s=>s,at:e=>Date.parse(e.time),
+    det:e=>[e.min?`${Math.round(e.min)} min`:'',e.lessons?.length?`${e.lessons.length} lesson${e.lessons.length>1?'s':''}`:'']},
+  JOURNAL:{repo:'JOURNAL',key:'isx.journal.v1',rows:s=>s?.trades,at:e=>e.close,
+    det:e=>[e.contract||e.symbol,e.side,e.qty?`${e.qty} ct`:'']}
 };
 // good habits that tick themselves off when you log in another app; day:1 = counts once per day
 const LINKS={
@@ -255,13 +262,15 @@ function openApp(a,act){if(embedded)parent.postMessage({isx:'open',app:a.toLower
    MIND and LEARN entries are just time, so they're written straight from here; the rest need that app's form. */
 const quickLog=k=>!!LINKS[k]?.q;
 const rw=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}};
-// amt = minutes, or reps for bodyweight. id/at are given when moving an old REWIRE entry, so every device moves it the same way.
-function logTo(g,amt,at=Date.now(),id=uid()){
-  const L=LINKS[g.link],note='Logged from REWIRE';
+// d = the details that app keeps: amt (minutes, or reps per set), sets, dist, rpe, pre/post mood, note.
+// id/at are given when moving an old REWIRE entry, so every device moves it the same way.
+function logTo(g,d,at=Date.now(),id=uid()){
+  if(typeof d==='number')d={amt:d};
+  const L=LINKS[g.link],amt=d.amt,note=d.note||'';
   if(L.app==='MIND'){
     const s=rw('isx.mind.v1',{});if(!Array.isArray(s.log)){s.log=[];s.notes??={}}
     if(s.log.some(e=>e.id===id))return;
-    s.log.push({id,at,kind:L.kind,tech:'',mins:amt,pre:null,post:null,depth:null,note});
+    s.log.push({id,at,kind:L.kind,tech:'',mins:amt,pre:d.pre??null,post:d.post??null,depth:null,note});
     localStorage.setItem('isx.mind.v1',JSON.stringify(s));
   }else if(L.app==='LEARN'){
     const a=arr(rw('xl.sessions.v1',[]));if(a.some(e=>e.id===id))return;
@@ -271,24 +280,53 @@ function logTo(g,amt,at=Date.now(),id=uid()){
     const s=rw('isx.training.v1',{});if(!Array.isArray(s.log)){s.log=[];s.notes??={}}
     if(s.log.some(e=>e.id===id))return;
     const c=g.link==='cardio';
-    s.log.push({id,at,ex:g.ex||'Walk',type:c?'C':'B',sets:c?0:1,reps:c?0:amt,load:0,dist:0,mins:c?amt:0,rpe:null,note});
+    s.log.push({id,at,ex:g.ex||'Walk',type:c?'C':'B',sets:c?0:(d.sets||1),reps:c?0:amt,load:0,dist:c?(d.dist||0):0,mins:c?amt:0,rpe:d.rpe??null,note});
     localStorage.setItem('isx.training.v1',JSON.stringify(s));
   }
 }
 const arr=x=>Array.isArray(x)?x:[];
-function linkedDone(g){
-  const k=g.link,L=LINKS[k],unit=L.q==='reps'?'reps':'min',what=g.ex?`${g.ex} ${unit==='reps'?'reps':'session'}`:L.app==='MIND'?'session':L.app==='LEARN'?'study session':'session';
-  if(!quickLog(k))return openApp(L.app,L.act);
-  const done=n=>{logTo(g,n);dlg.open&&dlg.close();render();toast(`${g.name} ✓ · ${n} ${unit} logged in ${L.app}`)};
-  // the name already says how much ("Walk 10 min", "20 push-ups"): one tap
-  const n=amountIn(g.name,L.q);if(n)return done(n);
-  const opts=unit==='reps'?[5,10,15,20,25,30,50]:[5,10,15,20,30,45,60];
-  dlg.innerHTML=`<div><h3>${esc(g.name).toUpperCase()} // ${L.app}</h3>
-   <p class="dim" style="margin-bottom:12px">How ${unit==='reps'?'many':'long'}? It's saved as a ${what} in ${L.app}, so it shows there and ticks off here.</p>
-   <div class="chips">${opts.map(m=>`<button type="button" data-m="${m}">${m} ${unit.toUpperCase()}</button>`).join('')}</div>
-   <div class="fa2" style="margin-top:14px"><button type="button" data-a="x">CANCEL</button><button type="button" id="lo">OPEN ${L.app} INSTEAD</button></div></div>`;
-  dlg.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>done(+b.dataset.m));
-  $('#lo').onclick=()=>{dlg.close();openApp(L.app,{MIND:'go',LEARN:'startnext',TRAINING:'go'}[L.app])};
+const detail=a=>a.filter(Boolean).map(String).join(' · ');
+// what a done entry adds up to, for the log and today's list
+const doneDet=e=>e.det!=null?e.det:detail([e.amt!=null?`${e.amt} ${e.unit||''}`.trim():'',e.feel?`felt ${e.feel}/10`:'',e.b&&badOf(e.b)?`instead of ${badOf(e.b).name}`:'']);
+/* ---------- good habit done: the details its app keeps ----------
+   MIND gets minutes and mood before/after, TRAINING minutes, distance and effort (or sets x reps), LEARN minutes.
+   A habit that lives only in REWIRE keeps an amount, how you felt after, what it replaced and a note. */
+function doneForm(g,e){
+  const L=LINKS[g.link];
+  if(L&&!L.q)return openApp(L.app,L.act);
+  const own=!L,reps=L?.q==='reps',cardio=g.link==='cardio';
+  const du=rw('isx.training.v1',{}).du||(/-US$/.test(navigator.language||'')?'mi':'km');
+  const um=/(\d+)\s*([a-z][a-z-]*)/i.exec(g.name);   // "Read 5 pages" -> 5 pages
+  const d=e||{at:Date.now(),amt:own?(um?+um[1]:null):amountIn(g.name,L.q),unit:own?(um?um[2]:'min'):null,note:'',b:null,feel:null};
+  dlg.innerHTML=`<form id="df"><h3>${esc(g.name).toUpperCase()}${L?` // ${L.app}`:''}</h3>
+   <p class="dim" style="margin-bottom:12px">${L?`Saved in ${L.app} with these details, so it shows there and ticks off here.`:'Saved in REWIRE.'}</p>
+   <div class="fgrid">
+    <label>When<input name="when" type="datetime-local" required value="${dtl(d.at)}"></label>
+    ${reps?`<label>Sets<input name="sets" type="number" min="1" step="1" value="1"></label><label>Reps per set<input name="amt" type="number" min="1" step="1" required value="${d.amt??''}"></label>`
+     :own?`<label>How much (optional)<span class="pair"><input name="amt" type="number" min="0" step="any" value="${d.amt??''}" placeholder="—"><input name="unit" value="${esc(d.unit||'min')}" aria-label="Unit"></span></label>`
+     :`<label>Minutes<input name="amt" type="number" min="1" step="1" required value="${d.amt??''}"></label>`}
+    ${cardio?`<label>Distance (${du}, optional)<input name="dist" type="number" min="0" step="any" placeholder="—"></label>`:''}
+   </div>
+   ${L?.app==='MIND'?rpick('pre','Mood before (1–10)',null)+rpick('post','Mood after',null):''}
+   ${L?.app==='TRAINING'?rpick('rpe','Effort (RPE 1–10, optional)',null):''}
+   ${own?rpick('feel','How do you feel after? (optional)',d.feel):''}
+   ${own&&S.bad.length?`<span class="k">Instead of (optional)</span><div class="chips" data-c="b">${S.bad.map(b=>`<button type="button" data-cv="${b.id}"${d.b===b.id?' class="on"':''}>${esc(b.name)}</button>`).join('')}</div>`:''}
+   ${L?.app==='LEARN'?'':`<label>Note<textarea name="note" rows="2" placeholder="Optional">${esc(d.note||'')}</textarea></label>`}
+   <div class="fa2"><span id="pv"></span>${L?`<button type="button" id="lo">OPEN ${L.app}</button>`:''}<button type="button" data-a="x">CANCEL</button><button class="pri">SAVE</button></div></form>`;
+  const f=$('#df'),el=f.elements,num=n=>el[n]&&el[n].value!==''?+el[n].value:null;
+  $('#lo')&&($('#lo').onclick=()=>{dlg.close();openApp(L.app,{MIND:'go',LEARN:'startnext',TRAINING:'go'}[L.app])});
+  f.onsubmit=ev=>{
+    ev.preventDefault();
+    const at=new Date(el.when.value).getTime(),note=el.note?el.note.value.trim():'',amt=num('amt');
+    if(!isFinite(at)){$('#pv').innerHTML='<b class="neg">Pick a time</b>';return}
+    if(L){
+      logTo(g,{amt,sets:num('sets'),dist:num('dist'),rpe:rval('rpe'),pre:rval('pre'),post:rval('post'),note},at);
+      dlg.close();render();toast(`${g.name} ✓ · saved in ${L.app}`);return;
+    }
+    const v={at,t:'done',g:g.name,amt,unit:amt!=null?(el.unit.value.trim()||'min'):null,feel:rval('feel'),b:cval('b'),note};
+    if(e)Object.assign(S.log.find(x=>x.id===e.id),v);else S.log.push({id:uid(),...v});
+    save();dlg.close();render();toast(`${g.name} ✓`);
+  };
   dlg.showModal();
 }
 function appRows(a){try{const r=APPS[a].rows(JSON.parse(localStorage.getItem(APPS[a].key)));return Array.isArray(r)?r:null}catch(e){return null}}
@@ -297,11 +335,11 @@ function linked(){
   const out=[],cache={};
   S.good.forEach(g=>{
     const L=LINKS[g.link];if(!L)return;
-    const rows=cache[L.app]??=appRows(L.app)||[],seen=new Set();
+    const rows=cache[L.app]??=appRows(L.app)||[],seen=new Set(),src=cache[L.app+'#']??=rw(APPS[L.app].key,null);
     rows.filter(e=>!L.f||L.f(e,g)).forEach(e=>{
       const at=APPS[L.app].at(e);if(!isFinite(at))return;
       const day=ymd(new Date(at));if(L.day){if(seen.has(day))return;seen.add(day)}
-      out.push({id:'lk-'+g.link+(g.ex||'')+'-'+at,at,t:'done',g:g.name,src:L.app,ro:1,note:''});
+      out.push({id:'lk-'+g.link+(g.ex||'')+'-'+at,at,t:'done',g:g.name,src:L.app,ro:1,det:detail(APPS[L.app].det(e,src)),note:e.note||''});
     });
   });
   return out;
@@ -435,10 +473,11 @@ function today(){
   const t=ymd(new Date()),L=[...S.log,...LK].filter(e=>ymd(new Date(e.at))===t);
   const bad=S.bad.map(b=>{const st=streak([b.id]),u=L.filter(e=>e.b===b.id&&e.t!=='done');
     return `<div class="trow"><div><b>${esc(b.name)}</b><div class="dim">${span(st.cur)} clean · ${u.filter(e=>e.t==='resist').length} beaten today</div></div><button class="pri" data-a="urge" data-v="${b.id}">URGE</button></div>`}).join('');
-  const good=S.good.map(g=>{const n=L.filter(e=>isDone(e)&&e.g===g.name).length,tg=g.target||1;
+  const good=S.good.map(g=>{const D=L.filter(e=>isDone(e)&&e.g===g.name).sort((a,b)=>a.at-b.at),n=D.length,tg=g.target||1;
+    const dl=D.slice(-3).map(e=>`<div class="dd">✓ ${new Date(e.at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}${doneDet(e)?' · '+esc(doneDet(e)):''}${e.note?` <span class="dim">— ${esc(e.note.length>48?e.note.slice(0,47)+'…':e.note)}</span>`:''}</div>`).join('');
     const lk=LINKS[g.link],none=lk&&!appRows(lk.app);
-    return `<div class="trow"><div><b class="${n>=tg?'pos':''}">${esc(g.name)}</b><div class="dim">${n} / ${tg} today${n>=tg?' ✓':''}${lk?` · <span class="amb">via ${lk.app}</span>${none?' (no data here yet)':''}`:''}</div></div>
-     <span class="tb">${!lk?`<button data-a="done" data-v="${esc(g.name)}">+ DONE</button>`:quickLog(g.link)?`<a class="btn" href="${appUrl(lk.app)}" target="_blank" rel="noopener" data-app="${lk.app}">OPEN</a><button data-a="done" data-v="${esc(g.name)}">+ DONE</button>`:`<button data-a="done" data-v="${esc(g.name)}">LOG IN ${lk.app}</button>`}</span></div>`}).join('');
+    return `<div class="trow"><div><b class="${n>=tg?'pos':''}">${esc(g.name)}</b><div class="dim">${n} / ${tg} today${n>=tg?' ✓':''}${lk?` · <span class="amb">via ${lk.app}</span>${none?' (no data here yet)':''}`:''}</div>${dl}</div>
+     <span class="tb">${!lk?`<button data-a="done" data-v="${esc(g.name)}">+ DONE</button>`:quickLog(g.link)?`<button data-a="done" data-v="${esc(g.name)}">+ DONE</button>`:`<button data-a="done" data-v="${esc(g.name)}">LOG IN ${lk.app}</button>`}</span></div>`}).join('');
   return `<div class="card"><p class="h">Today</p>
    <div class="sec first">Breaking</div>${bad||'<p class="dim">No habit to break yet_</p>'}
    <div class="sec">Building</div>${good||'<p class="dim">No good habits yet_</p>'}
@@ -450,7 +489,7 @@ function table(T){
   U.page=Math.min(Math.max(U.page,0),pages-1);
   const what=e=>e.t==='done'?`<b class="pos">GOOD</b>${e.src?` <span class="dim">· ${e.src}</span>`:''}`:e.t==='slip'?`<b class="neg">SLIP</b>`:`<b class="pos">BEAT URGE</b>`;
   const body=rows.slice(U.page*PAGE,(U.page+1)*PAGE).map(e=>`<tr>
-   <td>${tfmt(e.at)}</td><td>${what(e)}</td><td>${e.b?esc(badOf(e.b)?.name||'—'):na}</td><td>${e.g?esc(e.g):na}</td>
+   <td>${tfmt(e.at)}</td><td>${what(e)}</td><td>${e.b?esc(badOf(e.b)?.name||'—'):na}</td><td>${e.g?esc(e.g):na}${e.t==='done'&&doneDet(e)?`<div class="dim sm">${esc(doneDet(e))}</div>`:''}</td>
    <td class="r">${e.int??na}</td><td class="dim">${esc(e.trig)||'—'}</td>
    <td class="dim" title="${esc(e.note)}">${esc((e.note||'').length>40?e.note.slice(0,39)+'…':e.note||'')}</td>
    <td class="r">${e.ro?`<a class="btn sm" href="${appUrl(e.src)}" target="_blank" rel="noopener" data-app="${e.src}">${e.src}</a>`:`<button data-a="edit" data-v="${e.id}">EDIT</button> <button data-a="del" data-v="${e.id}" aria-label="Delete entry">X</button>`}</td></tr>`).join('');
@@ -730,8 +769,8 @@ function dl(name,text,type){const a=document.createElement('a');a.href=URL.creat
 function exportCSV(){
   const T=view();if(!T.length)return toast('Nothing to export');
   const q=v=>{v=String(v??'');return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v};
-  const rows=[['time','event','breaking','good_habit','urge','trigger','note'],
-    ...T.map(e=>[dtl(e.at),{done:'good habit',resist:'urge beaten',slip:'slip'}[e.t],badOf(e.b)?.name||'',e.g||'',e.int??'',e.trig||'',e.note||''])];
+  const rows=[['time','event','breaking','good_habit','details','app','urge','trigger','note'],
+    ...T.map(e=>[dtl(e.at),{done:'good habit',resist:'urge beaten',slip:'slip'}[e.t],badOf(e.b)?.name||'',e.g||'',e.t==='done'?doneDet(e):'',e.src||'',e.int??'',e.trig||'',e.note||''])];
   dl(`rewire-${ymd(new Date())}.csv`,rows.map(r=>r.map(q).join(',')).join('\n'),'text/csv');
 }
 function sample(){
@@ -758,13 +797,12 @@ function sample(){
 const ACT={
   urge:v=>R?draw():urgeForm(v),add:()=>entryForm(),habits:()=>habitsForm(),pick:v=>habitsForm(v),x:()=>dlg.close(),sample,csv:exportCSV,
   note:()=>noteForm(U.range in RANGES?ymd(new Date()):U.range),imp:()=>$('#file').click(),
-  done:v=>{const g=S.good.find(x=>x.name===v);if(g&&LINKS[g.link])return linkedDone(g);
-    S.log.push({id:uid(),at:Date.now(),t:'done',g:v,note:''});save();render();toast(`${v} ✓`)},
+  done:v=>doneForm(S.good.find(x=>x.name===v)||{name:v,target:1}),
   bak:()=>dl(`rewire-backup-${ymd(new Date())}.json`,JSON.stringify(S),'application/json'),
   clear:()=>{if(confirm('Delete ALL habits, entries and notes on this device?')){S={bad:[],good:[],log:[],notes:{}};save();U.range='all';U.h='all';boot()}},
   prev:()=>shift(-1),next:()=>shift(1),tod:()=>{setMonth(Date.now());render()},
   day:v=>{U.range=U.range===v?'all':v;U.page=0;render()},
-  edit:v=>entryForm(S.log.find(t=>t.id===v)),
+  edit:v=>{const e=S.log.find(t=>t.id===v);if(e?.t==='done')return doneForm({name:e.g,target:1},e);entryForm(e)},
   del:v=>{if(confirm('Delete this entry?')){S.log=S.log.filter(t=>t.id!==v);save();render()}},
   pp:()=>{U.page--;render()},pn:()=>{U.page++;render()}
 };
