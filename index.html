@@ -213,6 +213,22 @@ dialog.ss .gp{font-size:15px;line-height:1.6;max-width:32ch;margin:0 auto 12px;c
 dialog.ss p.c{font-size:12px;margin:0 0 8px}
 @media(min-width:700px){dialog.ss{inset:0;margin:auto;width:min(620px,calc(100% - 48px));height:min(900px,calc(100% - 48px));border:1px solid var(--line2)}}
 @media(prefers-reduced-motion:reduce){dialog.ss,dialog.ss>*{animation:none!important}}
+/* choices in a session read as a list, like the live workout's exercises: a dot (a box when you can pick several),
+   the name, a detail on the right. Short sets of options are one segmented bar. */
+dialog.ss .vl{display:flex;flex-direction:column;gap:0;margin:6px 0 20px;border-top:1px solid var(--line)}
+dialog.ss .vl button{display:flex;align-items:center;gap:12px;width:100%;padding:12px 4px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;font-size:13px;letter-spacing:0;color:var(--tx);transition:background-color .18s,color .18s}
+dialog.ss .vl button::before{content:'';flex:none;width:8px;height:8px;border-radius:50%;border:1px solid var(--line2);transition:background-color .18s,border-color .18s,box-shadow .18s}
+dialog.ss .vl button.on{color:var(--amber);background:rgba(255,176,0,.06)}
+dialog.ss .vl button.on::before{background:var(--amber);border-color:var(--amber);box-shadow:0 0 10px rgba(255,176,0,.6)}
+dialog.ss .vl.multi button::before{width:14px;height:14px;border-radius:2px;display:grid;place-items:center;font-size:10px;font-weight:600;line-height:1;color:#000}
+dialog.ss .vl.multi button.on::before{content:'✓';box-shadow:none}
+dialog.ss .vl button:hover{color:var(--amber)}
+dialog.ss .vl em{margin-left:auto;font-style:normal;font-size:11px;color:var(--dim);text-align:right}
+dialog.ss .vl button.on em{color:var(--amber)}
+dialog.ss .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:0;margin:6px 0 20px;border:1px solid var(--line2)}
+dialog.ss .seg button{border:0;border-right:1px solid var(--line2);padding:11px 2px;text-align:center;background:none;font-size:12px;transition:background-color .18s,color .18s}
+dialog.ss .seg button:last-child{border-right:0}
+dialog.ss .seg button.on{background:var(--amber);color:#000}
 </style>
 </head>
 <body>
@@ -660,7 +676,10 @@ const keepRun=()=>{try{localStorage.setItem(RUN,JSON.stringify(R))}catch(e){}};
 const elapsed=()=>Date.now()-R.t0;
 const rpick=(n,label,v)=>`<span class="k">${label}</span><div class="rate" data-n="${n}">${[1,2,3,4,5,6,7,8,9,10].map(i=>`<button type="button" data-r="${i}"${v===i?' class="on"':''}>${i}</button>`).join('')}</div>`;
 const rval=n=>{const b=dlg.querySelector(`.rate[data-n="${n}"] .on`);return b?+b.dataset.r:null};
-const cpick=(n,list,v)=>`<div class="chips" data-c="${n}">${list.map(x=>`<button type="button" data-cv="${esc(x)}"${x===v?' class="on"':''}>${esc(x)}</button>`).join('')}</div>`;
+// a pick-one list (triggers, swaps); em(x) = detail on the right
+const cpick=(n,list,v,em)=>`<div class="vl" data-c="${n}">${list.map(x=>`<button type="button" data-cv="${esc(x)}"${x===v?' class="on"':''}>${esc(x)}${em&&em(x)?`<em>${em(x)}</em>`:''}</button>`).join('')}</div>`;
+// where a good habit gets logged, shown next to swaps
+const swapApp=n=>{const l=LINKS[S.good.find(g=>g.name===n)?.link];return l?l.app:''};
 const cval=n=>dlg.querySelector(`[data-c="${n}"] .on`)?.dataset.cv??null;
 dlg.addEventListener('click',e=>{
   const b=e.target.closest('[data-r],[data-cv]');if(!b)return;
@@ -692,11 +711,11 @@ function urgeForm(bid){
   const pref=(()=>{try{return JSON.parse(localStorage.getItem(RUN+'.pref'))||{}}catch(e){return {}}})();
   let b=bid||(U.h!=='all'?U.h:S.bad[0].id);
   dlg.innerHTML=`<form id="uf"><h3>URGE</h3>
-   ${S.bad.length>1?`<span class="k">Which habit</span><div class="chips" id="ub">${S.bad.map(x=>`<button type="button" data-b="${x.id}"${x.id===b?' class="on"':''}>${esc(x.name)}</button>`).join('')}</div>`:''}
+   ${S.bad.length>1?`<span class="k">Which habit</span><div class="vl" id="ub">${S.bad.map(x=>`<button type="button" data-b="${x.id}"${x.id===b?' class="on"':''}>${esc(x.name)}<em>${span(streak([x.id]).cur)} clean</em></button>`).join('')}</div>`:''}
    ${rpick('int','How strong is it? (1–10)')}
    <span class="k">What set it off?</span>${cpick('trig',TRIG)}
    <span class="k">Surf it for</span>
-   <div class="chips" id="ul">${[1,3,5,10].map(m=>`<button type="button" data-m="${m}"${m===(pref.mins||3)?' class="on"':''}>${m} min</button>`).join('')}</div>
+   <div class="seg" id="ul">${[1,3,5,10].map(m=>`<button type="button" data-m="${m}"${m===(pref.mins||3)?' class="on"':''}>${m} min</button>`).join('')}</div>
    <p class="dim">Most urges peak and fade within minutes. Breathe with the bubble and let it pass.</p>
    <div class="fa2"><button type="button" class="ghost" data-a="x">CANCEL</button><button type="button" id="us">I ALREADY SLIPPED</button><button class="pri">SURF IT</button></div></form>`;
   const f=$('#uf');let mins=pref.mins||3;
@@ -723,7 +742,7 @@ function surfView(){
    <div class="ball" id="ball"></div><div class="cue" id="pc" aria-live="polite"></div></div>
   <p class="gp" id="gp"></p>
   <div class="clock" id="clk"></div>
-  ${reps.length?`<span class="k">Then swap in</span><div class="chips" id="sr">${reps.map(r=>`<button type="button" data-sr="${esc(r)}"${r===R.rep?' class="on"':''}>${esc(r)}</button>`).join('')}</div>`:''}
+  ${reps.length?`<span class="k">Then swap in</span><div class="vl" id="sr">${reps.map(r=>`<button type="button" data-sr="${esc(r)}"${r===R.rep?' class="on"':''}>${esc(r)}${swapApp(r)?`<em>${swapApp(r)}</em>`:''}</button>`).join('')}</div>`:''}
   <div class="fa2"><button type="button" id="sl">I SLIPPED</button><button type="button" class="pri" id="sd">IT PASSED</button></div></div>`;
   const len=R.mins*60000,P=SURF.map(p=>p.replace('{why}',h?.why||'you want this.').replace('{rep}',R.rep||'something good for you'));
   const tick=()=>{
@@ -744,7 +763,7 @@ function outcomeForm(){
   dlg.innerHTML=`<form id="of"><h3>${R.slipped?'SLIPPED':'URGE PASSED'} // ${esc(h?.name||'').toUpperCase()}</h3>
    ${R.slipped?`<p class="dim">A slip is data, not a verdict. Note what happened. The streak restarts now, and the next urge is a fresh chance.</p>`
    :`<p class="pos">You rode it out${R.end>R.t0?` in ${fm((R.end-R.t0)/60000)}`:''}. Each time, the loop gets weaker.</p>
-     ${reps.length?`<span class="k">Swap you did</span>${cpick('rep',reps,R.rep)}`:''}`}
+     ${reps.length?`<span class="k">Swap you did</span>${cpick('rep',reps,R.rep,swapApp)}`:''}`}
    ${R.int==null?rpick('int','How strong was it? (1–10)'):''}
    ${R.trig?'':`<span class="k">What set it off?</span>${cpick('trig',TRIG)}`}
    <label>Note<textarea name="note" rows="3" placeholder="${R.slipped?'Where, when, what would help next time.':'What helped.'}"></textarea></label>
