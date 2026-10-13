@@ -177,6 +177,42 @@ fieldset>label{margin-bottom:10px}
 .grow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.grow select[name=gl]{flex:1 0 100%;font-size:12px;color:var(--dim)}.grow input[name=gn]{flex:1;min-width:0}.grow input[name=gt]{width:64px}
 #hf>button{width:100%;margin-bottom:12px}
 .empty .chips{margin:10px 0 12px}
+/* ---------- session sheet: the start, live and done screens of a session ----------
+   Full screen on a phone (a centred sheet on wide screens) with no hard frame and a soft amber glow behind the
+   bubble. It slides up when it opens and each step fades in, so start -> live -> done flows instead of jumping. */
+dialog.ss{position:fixed;inset:0;width:100%;max-width:none;height:100%;max-height:none!important;margin:0;border:0;
+  padding:calc(env(safe-area-inset-top) + 18px) 20px 0;overflow-y:auto;overscroll-behavior:contain;
+  background:radial-gradient(90% 42% at 50% 30%,rgba(255,176,0,.07),transparent 72%),var(--bg);
+  animation:ssIn .4s cubic-bezier(.2,.8,.2,1)!important}
+dialog.ss::backdrop{background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+@keyframes ssIn{from{opacity:0;transform:translateY(32px)}}
+@keyframes ssFade{from{opacity:0;transform:translateY(6px)}}
+dialog.ss>*{display:flex;flex-direction:column;min-height:100%;max-width:520px;margin:0 auto;animation:ssFade .3s ease both}
+dialog.ss h3{align-self:center;text-align:center;font-size:11px;font-weight:600;letter-spacing:.22em;color:var(--dim);margin:4px 0 24px}
+/* start screen: room to breathe, one family of chips, the action pinned to the bottom */
+dialog.ss .chips{gap:8px;margin:6px 0 20px}
+dialog.ss .chips button{padding:9px 12px}
+dialog.ss .chips button,dialog.ss .rate button{transition:background-color .18s,border-color .18s,color .18s}
+dialog.ss .rate{gap:6px;margin:6px 0 20px}
+dialog.ss .rate button{padding:10px 0}
+dialog.ss label{margin-bottom:6px}
+dialog.ss .fa2{position:sticky;bottom:0;z-index:2;margin:auto -20px 0;padding:22px 20px calc(env(safe-area-inset-bottom) + 18px);
+  background:linear-gradient(rgba(7,7,7,0),var(--bg) 40%);display:flex;gap:10px}
+dialog.ss .fa2>button{flex:1;padding:14px 8px;font-size:12px;letter-spacing:.1em}
+dialog.ss .fa2{flex-wrap:wrap}dialog.ss .fa2>span{flex:1 0 100%;text-align:center;font-size:11px;color:var(--dim)}dialog.ss .fa2>span:empty{display:none}
+dialog.ss .fa2>.ghost{flex:0 0 auto;border-color:transparent;background:none;color:var(--dim)}
+/* live: the bubble is the screen, centred, with a large quiet clock */
+dialog.ss>*:has(>.bub)>.bub{margin-top:auto}
+dialog.ss .bub{width:min(76vw,330px);margin:8px auto 22px}
+dialog.ss .bub .rt{stroke:rgba(255,255,255,.07)}
+dialog.ss .ball{box-shadow:0 0 90px rgba(255,176,0,.16),inset 0 0 40px rgba(255,176,0,.06);transition:opacity .5s}
+dialog.ss .cue{letter-spacing:.28em;font-size:12px}
+dialog.ss .cue em{font-size:36px;font-weight:300}
+dialog.ss .clock{font-size:48px;font-weight:300;letter-spacing:.02em;margin:0 0 6px;font-variant-numeric:tabular-nums;transition:color .3s}
+dialog.ss .gp{font-size:15px;line-height:1.6;max-width:32ch;margin:0 auto 12px;color:#cfcabd;transition:opacity .3s}
+dialog.ss p.c{font-size:12px;margin:0 0 8px}
+@media(min-width:700px){dialog.ss{inset:0;margin:auto;width:min(620px,calc(100% - 48px));height:min(900px,calc(100% - 48px));border:1px solid var(--line2)}}
+@media(prefers-reduced-motion:reduce){dialog.ss,dialog.ss>*{animation:none!important}}
 </style>
 </head>
 <body>
@@ -355,6 +391,10 @@ const SURF=['Notice where the urge sits in your body. Just notice it.','Name it:
 const CALM=[['INHALE',4],['EXHALE',6]];
 
 const $=s=>document.querySelector(s), dlg=$('#dlg');
+// session screens (start, live, done) open as a full-screen sheet; other dialogs keep the usual box
+const sheet=()=>dlg.classList.add('ss');
+dlg.addEventListener('close',()=>dlg.classList.remove('ss'));
+
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
 const r2=v=>Math.round(v*100)/100;
@@ -645,7 +685,7 @@ function breath(ms){
   return {c:'',left:0,s};
 }
 function clearRun(){clearInterval(RI);cancelAnimationFrame(RA);RI=0;R=null;try{localStorage.removeItem(RUN)}catch(e){}wake(false)}
-function draw(){clearInterval(RI);cancelAnimationFrame(RA);if(R.end)outcomeForm();else surfView();if(!dlg.open)dlg.showModal()}
+function draw(){clearInterval(RI);cancelAnimationFrame(RA);if(R.end)outcomeForm();else surfView();sheet();if(!dlg.open)dlg.showModal()}
 
 function urgeForm(bid){
   if(!S.bad.length)return habitsForm();
@@ -658,7 +698,7 @@ function urgeForm(bid){
    <span class="k">Surf it for</span>
    <div class="chips" id="ul">${[1,3,5,10].map(m=>`<button type="button" data-m="${m}"${m===(pref.mins||3)?' class="on"':''}>${m} min</button>`).join('')}</div>
    <p class="dim">Most urges peak and fade within minutes. Breathe with the bubble and let it pass.</p>
-   <div class="fa2"><button type="button" id="us">I ALREADY SLIPPED</button><button type="button" data-a="x">CANCEL</button><button class="pri">SURF IT</button></div></form>`;
+   <div class="fa2"><button type="button" class="ghost" data-a="x">CANCEL</button><button type="button" id="us">I ALREADY SLIPPED</button><button class="pri">SURF IT</button></div></form>`;
   const f=$('#uf');let mins=pref.mins||3;
   f.addEventListener('click',ev=>{
     const x=ev.target.closest('[data-b]'),m=ev.target.closest('[data-m]');
@@ -674,7 +714,7 @@ function urgeForm(bid){
     R={b,int:rval('int'),trig:cval('trig'),mins,t0:Date.now(),end:null,rep:badOf(b).reps[0]||null};
     bell(1);keepRun();draw();
   };
-  dlg.showModal();
+  sheet();dlg.showModal();
 }
 function surfView(){
   const h=badOf(R.b),reps=h?.reps||[];
@@ -708,7 +748,7 @@ function outcomeForm(){
    ${R.int==null?rpick('int','How strong was it? (1–10)'):''}
    ${R.trig?'':`<span class="k">What set it off?</span>${cpick('trig',TRIG)}`}
    <label>Note<textarea name="note" rows="3" placeholder="${R.slipped?'Where, when, what would help next time.':'What helped.'}"></textarea></label>
-   <div class="fa2"><button type="button" id="ox">DISCARD</button>${R.slipped?'':'<button type="button" id="os">ACTUALLY SLIPPED</button><button type="button" id="oo" hidden>SAVE &amp; OPEN</button>'}<button class="pri">SAVE</button></div></form>`;
+   <div class="fa2"><button type="button" class="ghost" id="ox">DISCARD</button>${R.slipped?'':'<button type="button" id="os">ACTUALLY SLIPPED</button><button type="button" id="oo" hidden>SAVE &amp; OPEN</button>'}<button class="pri">SAVE</button></div></form>`;
   const f=$('#of');
   $('#ox').onclick=()=>{if(confirm('Discard this urge without logging it?')){clearRun();dlg.close()}};
   $('#os')&&($('#os').onclick=()=>{R.slipped=true;keepRun();draw()});
