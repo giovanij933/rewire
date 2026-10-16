@@ -313,7 +313,10 @@ function openApp(a,act){if(embedded)parent.postMessage({isx:'open',app:a.toLower
    JOURNAL, REWIRE and TODAY all show the same thing, and deleting it there removes it here too.
    MIND and LEARN entries are just time, so they're written straight from here; the rest need that app's form. */
 const quickLog=k=>!!LINKS[k]?.q;
-const rw=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}};
+const rw=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}};   // a fresh copy, safe to change and save
+// read-only view of another app's data, parsed once per change: every render looks at it once per linked habit.
+// Shared, so never modify what it returns (use rw() for that).
+const PC=new Map(),peek=k=>{const raw=localStorage.getItem(k),c=PC.get(k);if(c&&c.raw===raw)return c.v;let v=null;try{v=JSON.parse(raw)}catch(e){}PC.set(k,{raw,v});return v};
 // d = the details that app keeps: amt (minutes, or reps per set), sets, dist, rpe, pre/post mood, note.
 // id/at are given when moving an old REWIRE entry, so every device moves it the same way.
 function logTo(g,d,at=Date.now(),id=uid()){
@@ -347,7 +350,7 @@ function doneForm(g,e){
   const L=LINKS[g.link];
   if(L&&!L.q)return openApp(L.app,L.act);
   const own=!L,reps=L?.q==='reps',cardio=g.link==='cardio';
-  const du=rw('isx.training.v1',{}).du||(/-US$/.test(navigator.language||'')?'mi':'km');
+  const du=peek('isx.training.v1')?.du||(/-US$/.test(navigator.language||'')?'mi':'km');
   const um=/(\d+)\s*([a-z][a-z-]*)/i.exec(g.name);   // "Read 5 pages" -> 5 pages
   const d=e||{at:Date.now(),amt:own?(um?+um[1]:null):amountIn(g.name,L.q),unit:own?(um?um[2]:'min'):null,note:'',b:null,feel:null};
   dlg.innerHTML=`<form id="df"><h3>${esc(g.name).toUpperCase()}${L?` // ${L.app}`:''}</h3>
@@ -381,13 +384,13 @@ function doneForm(g,e){
   };
   dlg.showModal();
 }
-function appRows(a){try{const r=APPS[a].rows(JSON.parse(localStorage.getItem(APPS[a].key)));return Array.isArray(r)?r:null}catch(e){return null}}
+function appRows(a){try{const r=APPS[a].rows(peek(APPS[a].key));return Array.isArray(r)?r:null}catch(e){return null}}
 // completions pulled from the other apps, shaped like 'done' entries
 function linked(){
   const out=[],cache={};
   S.good.forEach(g=>{
     const L=LINKS[g.link];if(!L)return;
-    const rows=cache[L.app]??=appRows(L.app)||[],seen=new Set(),src=cache[L.app+'#']??=rw(APPS[L.app].key,null);
+    const rows=cache[L.app]??=appRows(L.app)||[],seen=new Set(),src=cache[L.app+'#']??=peek(APPS[L.app].key);
     rows.filter(e=>!L.f||L.f(e,g)).forEach(e=>{
       const at=APPS[L.app].at(e);if(!isFinite(at))return;
       const day=ymd(new Date(at));if(L.day){if(seen.has(day))return;seen.add(day)}
@@ -417,12 +420,15 @@ const r2=v=>Math.round(v*100)/100;
 const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const pd=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
 const dtl=ms=>{const d=new Date(ms);return `${ymd(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`};
-const dlabel=s=>pd(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-const tfmt=ms=>new Date(ms).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-const n1=v=>(+v).toLocaleString('en-US',{maximumFractionDigits:1});
+// formatters made once: toLocaleString builds a new one on every call, which adds up over long tables and charts
+const FMT={dmy:new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',year:'numeric'}),dt:new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}),
+  n0:new Intl.NumberFormat('en-US',{maximumFractionDigits:0}),n1:new Intl.NumberFormat('en-US',{maximumFractionDigits:1}),n2:new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})};
+const dlabel=s=>FMT.dmy.format(pd(s));
+const tfmt=ms=>FMT.dt.format(ms);
+const n1=v=>FMT.n1.format(+v);
 const fm=m=>{const t=Math.max(0,Math.round(m*60));return `${Math.floor(t/60)}:${pad(t%60)}`};
 const span=ms=>{ms=Math.max(0,ms);const d=Math.floor(ms/DAY),h=Math.floor(ms%DAY/36e5),m=Math.floor(ms%36e5/6e4);return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m`};
-const money=(v,u)=>u==='min'?(v>=60?`${Math.floor(v/60)}h ${Math.round(v%60)}m`:`${Math.round(v)}m`):'$'+Math.round(v).toLocaleString('en-US');
+const money=(v,u)=>u==='min'?(v>=60?`${Math.floor(v/60)}h ${Math.round(v%60)}m`:`${Math.round(v)}m`):'$'+FMT.n0.format(Math.round(v));
 const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 
@@ -481,7 +487,16 @@ function gauge(segs,label){
   const arcs=segs.map(([v,c])=>{const a=`<path class="${c}" d="${ARC}" pathLength="100" stroke-dasharray="${(v*100).toFixed(2)} 100" stroke-dashoffset="${(-off*100).toFixed(2)}"/>`;off+=v;return a}).join('');
   return `<svg class="gauge" viewBox="0 0 124 70"><path class="s0" d="${ARC}"/>${arcs}<text x="62" y="60" text-anchor="middle">${label}</text></svg>`;
 }
+// a chart is ~600 px wide: more points than that only costs time and memory. Keep each bucket's low and high, in
+// order, so peaks and drawdowns still show.
+function thin(v,max=300){
+  if(v.length<=max)return v;
+  const out=[],b=v.length/(max/2);
+  for(let i=0;i<v.length;i+=b){const s=v.slice(Math.floor(i),Math.floor(i+b));if(!s.length)continue;let lo=0,hi=0;s.forEach((x,j)=>{if(x<s[lo])lo=j;if(x>s[hi])hi=j});out.push(...(lo<hi?[s[lo],s[hi]]:[s[hi],s[lo]]))}
+  out.push(v[v.length-1]);return out;
+}
 function line(vals,c){
+  vals=thin(vals);
   const w=600,h=160,p=6,n=vals.length;if(n<2)return ND;
   const lo=Math.min(0,...vals),hi=Math.max(1,...vals),rg=hi-lo||1;
   const x=i=>(p+i*(w-2*p)/(n-1)).toFixed(1),y=v=>(p+(hi-v)*(h-2*p)/rg).toFixed(1);
