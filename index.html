@@ -930,8 +930,8 @@ function heroToday(){
   return UI.hero({key:'rewire',title:'Today',sub:`${S.bad.map(b=>b.name).join(' · ')}${sl?' · slipped today':''}`,
     big:{value:span(st.cur),label:'clean'},
     rings:[{key:'clean',label:'Clean',value:cleanD,max:goal,display:`${cleanD}/${goal} days`},{key:'good',label:'Good habits',value:gd,max:Math.max(1,gt),display:`${gd}/${gt}`},{key:'urges',label:'Urges beaten',value:r,max:Math.max(1,r+sl),display:r+sl?`${r}/${r+sl}`:'none yet',done:r+sl>0&&!sl}],
-    action:{label:'Urge',attrs:{'data-a':'urge'}}})
-  +UI.timeline({items:L.map(e=>({at:e.at,tag:e.t==='slip'?'Slip':e.t==='resist'?'Urge beaten':'Good habit',text:e.t==='done'?`${e.g}${e.src?' · via '+e.src:''}`:`${badOf(e.b)?.name||''}${e.g?' → '+e.g:''}`,tone:e.t==='slip'?'neg':'pos'})),empty:'Nothing yet today. Urges beaten, slips and good habits show up here.'});
+    action:{label:'Urge',attrs:{'data-a':'urge'}},
+    log:L.map(e=>({at:e.at,tag:e.t==='slip'?'Slip':e.t==='resist'?'Urge beaten':'Good habit',text:e.t==='done'?`${e.g}${e.src?' · via '+e.src:''}`:`${badOf(e.b)?.name||''}${e.g?' → '+e.g:''}`,tone:e.t==='slip'?'neg':'pos'}))});
 }
 {const r0=render;render=function(...a){r0.apply(this,a);UI.animate($('#app'),{onDone:l=>toast(`${l.join(' + ')} ✓`)})};UI.animate($('#app'))}
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
