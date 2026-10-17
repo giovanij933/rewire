@@ -242,6 +242,7 @@ h1.brand{margin:0}
     <button data-a="add">+ LOG</button>
     <button data-a="habits">HABITS</button>
     <button data-a="note">NOTES</button>
+    <button data-a="set">SETTINGS</button>
     <input id="file" type="file" accept=".json,application/json" hidden>
   </div>
 </header>
@@ -625,8 +626,7 @@ function render(){
   ${line(dk.reduce((a,k)=>(a.push((a.at(-1)||0)+s.D[k].r+s.D[k].g),a),[]),'cg')}</div>
 </section>
 ${table(T)}
-<footer><p>Urges rise, peak and pass, usually within minutes. Surf them, swap in a good habit, and the old loop weakens each time. If a habit involves alcohol, drugs or gambling and feels out of your control, talk to a doctor or a support line — stopping some substances suddenly needs medical help.</p>
- Saved on this device · SYNC shares it across your devices <button data-a="bak">BACKUP JSON</button><button data-a="imp">RESTORE</button><button data-a="clear">CLEAR ALL</button></footer>`;
+<footer><p>Urges rise, peak and pass, usually within minutes. Surf them, swap in a good habit, and the old loop weakens each time. If a habit involves alcohol, drugs or gambling and feels out of your control, talk to a doctor or a support line — stopping some substances suddenly needs medical help.</p></footer>`;
 }
 
 /* ---------- habits setup ---------- */
@@ -877,7 +877,20 @@ function sample(){
 }
 
 /* ---------- events ---------- */
+/* ---------- settings: everything that used to sit in the footer, behind the header's SETTINGS button ---------- */
+function settingsForm(){
+  dlg.innerHTML=`<h3>SETTINGS</h3>
+  <div class="ui-set">
+    <div><span><b>Habits</b><small>What you're breaking and what you're building</small></span><span class="ui-set-btns"><button type="button" data-a="habits">EDIT HABITS</button></span></div>
+    <div><span><b>Sync</b><small>${window.ISXSync?.state==='ok'?'On · this app syncs across your devices':'Keep every app the same on all your devices'}</small></span><span class="ui-set-btns"><button type="button" data-a="sync">SYNC…</button></span></div>
+    <div><span><b>Backup</b><small>Saved on this device. Download a copy, or restore one.</small></span><span class="ui-set-btns"><button type="button" data-a="bak">BACKUP JSON</button><button type="button" data-a="imp">RESTORE</button></span></div>
+    <div><span><b>Delete everything</b><small>Removes all of this app's data on this device.</small></span><span class="ui-set-btns"><button type="button" class="ui-danger" data-a="clear">CLEAR ALL</button></span></div>
+  </div>
+  <div class="fa2"><button type="button" class="pri" data-a="x">DONE</button></div>`;
+  dlg.showModal();
+}
 const ACT={
+  set:()=>settingsForm(),sync:()=>{dlg.close();document.getElementById('isx-sync')?.click()},
   urge:v=>R?draw():urgeForm(v),add:()=>entryForm(),habits:()=>habitsForm(),pick:v=>habitsForm(v),x:()=>dlg.close(),sample,csv:exportCSV,
   note:()=>noteForm(U.range in RANGES?ymd(new Date()):U.range),imp:()=>$('#file').click(),
   done:v=>doneForm(S.good.find(x=>x.name===v)||{name:v,target:1}),
