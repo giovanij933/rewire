@@ -88,6 +88,7 @@ button:hover,select:hover{border-color:var(--amber);color:var(--amber)}
 .eqs{display:flex;gap:22px;flex-wrap:wrap}
 .eqs div{display:flex;flex-direction:column;gap:2px}
 .chart{display:block;width:100%;height:160px}
+.cap{font-size:10.5px;color:var(--dim);margin-top:6px;letter-spacing:.04em}
 .chart *{vector-effect:non-scaling-stroke}
 .chart .ln{fill:none;stroke-width:1.5}
 .chart .z{stroke:var(--line2);stroke-dasharray:4 4}
@@ -244,6 +245,7 @@ h1.brand{margin:0}
     <input id="file" type="file" accept=".json,application/json" hidden>
   </div>
 </header>
+<div id="top"></div>
 <div class="bar">
   <select data-f="h" aria-label="Habit"></select>
   <select data-f="range" aria-label="Range"></select>
@@ -492,14 +494,12 @@ function gauge(segs,label){
 }
 // a chart is ~600 px wide: more points than that only costs time and memory. Keep each bucket's low and high, in
 // order, so peaks and drawdowns still show.
-function thin(v,max=300){
-  if(v.length<=max)return v;
-  const out=[],b=v.length/(max/2);
-  for(let i=0;i<v.length;i+=b){const s=v.slice(Math.floor(i),Math.floor(i+b));if(!s.length)continue;let lo=0,hi=0;s.forEach((x,j)=>{if(x<s[lo])lo=j;if(x>s[hi])hi=j});out.push(...(lo<hi?[s[lo],s[hi]]:[s[hi],s[lo]]))}
-  out.push(v[v.length-1]);return out;
-}
+// long ranges: average runs of k neighbours so every bar or point stays readable on a phone (the newest run ends
+// on the latest value). Returns the values and k, so the chart can say what one bar stands for.
+function bucket(v,max){const n=v.length;if(n<=max)return{v,k:1};const k=Math.ceil(n/max),o=[];for(let e=n;e>0;e-=k){const s=v.slice(Math.max(0,e-k),e);o.unshift(s.reduce((a,x)=>a+(+x||0),0)/s.length)}return{v:o,k}}
+const cap=(k,what='days')=>k>1?`<div class="cap">Each bar averages ${k} ${what}</div>`:'';
 function line(vals,c){
-  vals=thin(vals);
+  vals=bucket(vals,120).v;
   const w=600,h=160,p=6,n=vals.length;if(n<2)return ND;
   const lo=Math.min(0,...vals),hi=Math.max(1,...vals),rg=hi-lo||1;
   const x=i=>(p+i*(w-2*p)/(n-1)).toFixed(1),y=v=>(p+(hi-v)*(h-2*p)/rg).toFixed(1);
@@ -508,6 +508,11 @@ function line(vals,c){
 }
 // stacked bars: [[value,class],...] per column
 function stack(cols){
+  const n=cols.length,k=n>60?Math.ceil(n/60):1;if(k===1)return stack0(cols);
+  const o=[];for(let e=n;e>0;e-=k){const g=cols.slice(Math.max(0,e-k),e);o.unshift(g[0].map((x,j)=>[g.reduce((a,c)=>a+(c[j]?.[0]||0),0)/g.length,x[1]]))}
+  return stack0(o)+cap(k);
+}
+function stack0(cols){
   const w=600,h=160,p=6,lb=0,n=cols.length;if(!n||!cols.some(c=>c.some(v=>v[0])))return ND;
   const hi=Math.max(1,...cols.map(c=>c.reduce((s,v)=>s+v[0],0))),step=(w-2*p)/n,bw=Math.min(60,step*.7),H=h-p-lb;
   return `<svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${cols.map((c,i)=>{let y=H;
@@ -586,7 +591,8 @@ function render(){
   const dk=s.dk,hoursMax=Math.max(...s.hours),danger=hoursMax?s.hours.indexOf(hoursMax):null;
   const hr=h=>h==null?'—':new Date(2000,0,1,h).toLocaleTimeString('en-US',{hour:'numeric'});
 
-  $('#app').innerHTML=heroToday()+`${S.bad.length?'':`<div class="card empty"><p class="h">What do you want to break?</p><p class="dim">Name the habit, then choose the good habits that replace it. Good habits can link to MIND, TRAINING, NUTRITION, LEARN and JOURNAL and tick themselves off when you log there.</p>
+  $('#top').innerHTML=heroToday();
+  $('#app').innerHTML=`${S.bad.length?'':`<div class="card empty"><p class="h">What do you want to break?</p><p class="dim">Name the habit, then choose the good habits that replace it. Good habits can link to MIND, TRAINING, NUTRITION, LEARN and JOURNAL and tick themselves off when you log there.</p>
    <form id="ob" class="chips"><input name="n" required autocomplete="off" placeholder="The habit to break" aria-label="The habit to break" style="flex:1;min-width:200px;width:auto"><button class="pri">START</button><button type="button" data-a="sample">LOAD SAMPLE</button></form></div>`}
 <section class="g g4">
  <div class="card"><p class="h">Clean streak</p><div class="k">Since last slip</div><div class="big pos">${S.bad.length?span(st.cur):'—'}</div>
@@ -933,7 +939,7 @@ function heroToday(){
     action:{label:'Urge',attrs:{'data-a':'urge'}},
     log:L.map(e=>({at:e.at,tag:e.t==='slip'?'Slip':e.t==='resist'?'Urge beaten':'Good habit',text:e.t==='done'?`${e.g}${e.src?' · via '+e.src:''}`:`${badOf(e.b)?.name||''}${e.g?' → '+e.g:''}`,tone:e.t==='slip'?'neg':'pos'}))});
 }
-{const r0=render;render=function(...a){r0.apply(this,a);UI.animate($('#app'),{onDone:l=>toast(`${l.join(' + ')} ✓`)})};UI.animate($('#app'))}
+{const r0=render;render=function(...a){r0.apply(this,a);UI.animate($('#app'));UI.animate($('#top'),{onDone:l=>toast(`${l.join(' + ')} ✓`)})};UI.animate($('#top'));UI.animate($('#app'))}
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 </script>
 </body>
