@@ -1,8 +1,8 @@
 // Bump the version string whenever you change index.html so clients pick up the new shell.
-const CACHE = 'isx-rewire-v14';
+const CACHE = 'isx-rewire-v15';
 // all ISIONXXX apps share one site and one cache storage: only ever clear this app's own old caches
 const MINE = k => k.startsWith('isx-rewire-');
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './sync.js'];
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './sync.js', './ui.js', './ui.css'];
 
 // fetch this site's own files past the browser's HTTP cache (GitHub Pages lets it keep them ~10 min), so a new
 // version never installs or refreshes with the previous one's files; other sites (fonts, runtimes) as usual
