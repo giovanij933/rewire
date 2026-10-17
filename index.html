@@ -947,7 +947,7 @@ function heroToday(){
   const gd=S.good.reduce((a,g)=>a+Math.min(g.target||1,L.filter(e=>isDone(e)&&e.g===g.name).length),0),gt=S.good.reduce((a,g)=>a+(g.target||1),0);
   const r=L.filter(e=>e.t==='resist').length,sl=L.filter(e=>e.t==='slip').length;
   return UI.hero({key:'rewire',title:'Today',sub:`${S.bad.map(b=>b.name).join(' · ')}${sl?' · slipped today':''}`,
-    big:{value:span(st.cur),label:'clean'},
+    big:{value:span(st.cur),label:'clean',tone:sl?'neg':'pos'},   // red if you slipped today
     rings:[{key:'clean',label:'Clean',value:cleanD,max:goal,display:`${cleanD}/${goal} days`},{key:'good',label:'Good habits',value:gd,max:Math.max(1,gt),display:`${gd}/${gt}`},{key:'urges',label:'Urges beaten',value:r,max:Math.max(1,r+sl),display:r+sl?`${r}/${r+sl}`:'none yet',done:r+sl>0&&!sl}],
     action:{label:'Urge',attrs:{'data-a':'urge'}},
     log:L.map(e=>({at:e.at,tag:e.t==='slip'?'Slip':e.t==='resist'?'Urge beaten':'Good habit',text:e.t==='done'?`${e.g}${e.src?' · via '+e.src:''}`:`${badOf(e.b)?.name||''}${e.g?' → '+e.g:''}`,tone:e.t==='slip'?'neg':'pos'}))});
