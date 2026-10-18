@@ -232,6 +232,15 @@ dialog.ss .seg button{border:0;border-right:1px solid var(--line2);padding:11px 
 dialog.ss .seg button:last-child{border-right:0}
 dialog.ss .seg button.on{background:var(--amber);color:#000}
 h1.brand{margin:0}
+/* daily review: a script to read top to bottom */
+dialog.rvd{width:min(680px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+.rvh{display:flex;align-items:center;gap:8px;margin-bottom:6px}.rvh h3{margin:0;flex:1}
+.rv{border-top:1px solid var(--line);padding:14px 0 4px;font-size:14px;line-height:1.7}
+.rv h4{margin:0 0 6px;font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.rv p{margin:0 0 8px}.rv b{font-weight:600}.rv q{color:var(--dim);font-style:italic}
+.rv ol,.rv ul{margin:0 0 8px;padding-left:22px}.rv li{margin:0 0 6px}.rv li::marker{color:var(--dim)}
+.rv .tr{display:block;color:var(--dim);font-size:12px}
+.rv blockquote{margin:0 0 8px;padding:2px 0 2px 12px;border-left:2px solid var(--amber);white-space:pre-wrap}
 </style>
 </head>
 <body>
@@ -242,6 +251,7 @@ h1.brand{margin:0}
     <button data-a="add">+ LOG</button>
     <button data-a="habits">HABITS</button>
     <button data-a="note">NOTES</button>
+    <button data-a="review">REVIEW</button>
     <button data-a="set">SETTINGS</button>
     <input id="file" type="file" accept=".json,application/json" hidden>
   </div>
@@ -435,6 +445,7 @@ const n1=v=>FMT.n1.format(+v);
 const fm=m=>{const t=Math.max(0,Math.round(m*60));return `${Math.floor(t/60)}:${pad(t%60)}`};
 const span=ms=>{ms=Math.max(0,ms);const d=Math.floor(ms/DAY),h=Math.floor(ms%DAY/36e5),m=Math.floor(ms%36e5/6e4);return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m`};
 const money=(v,u)=>u==='min'?(v>=60?`${Math.floor(v/60)}h ${Math.round(v%60)}m`:`${Math.round(v)}m`):'$'+FMT.n0.format(Math.round(v));
+const hr=h=>h==null?'—':new Date(2000,0,1,h).toLocaleTimeString('en-US',{hour:'numeric'});
 const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 
@@ -462,13 +473,14 @@ function inRange(day){
 // the selected bad habit; good-habit check-offs always count (they belong to every habit)
 const view=(useRange=true)=>[...S.log,...LK].map(e=>({...e,day:ymd(new Date(e.at))}))
   .filter(e=>(U.h==='all'||e.t==='done'||e.b===U.h)&&(!useRange||inRange(e.day))).sort((a,b)=>a.at-b.at);
-// clean streak = time since the last slip (or since you started); best = the longest gap between slips
-function streak(ids){
-  const now=Date.now();let cur=Infinity,best=0,goal=0;
+// clean streak = time since the last slip (or since you started); best = the longest gap between slips.
+// now = the moment to measure at (the daily review asks about the end of a past day).
+function streak(ids,now=Date.now()){
+  let cur=Infinity,best=0,goal=0;
   ids.forEach(id=>{
     const b=badOf(id);if(!b)return;goal=Math.max(goal,b.goal||30);
     const sl=S.log.filter(e=>e.t==='slip'&&e.b===id).map(e=>e.at).sort((a,c)=>a-c);
-    const pts=[b.start,...sl.filter(t=>t>=b.start),now];let bb=0;
+    const pts=[b.start,...sl.filter(t=>t>=b.start&&t<=now),now];let bb=0;
     for(let i=1;i<pts.length;i++)bb=Math.max(bb,pts[i]-pts[i-1]);
     cur=Math.min(cur,now-pts[pts.length-2]);best=Math.max(best,bb);
   });
@@ -593,7 +605,6 @@ function render(){
   const sv=[s.saved.$?money(s.saved.$,'$'):'',s.saved.min?money(s.saved.min,'min'):''].filter(Boolean).join(' + ')||'—';
   const trend=s.early!=null&&s.late!=null&&s.urges>=4?s.late-s.early:null;
   const dk=s.dk,hoursMax=Math.max(...s.hours),danger=hoursMax?s.hours.indexOf(hoursMax):null;
-  const hr=h=>h==null?'—':new Date(2000,0,1,h).toLocaleTimeString('en-US',{hour:'numeric'});
 
   $('#top').innerHTML=heroToday();
   $('#app').innerHTML=`${S.bad.length?'':`<div class="card empty"><p class="h">What do you want to break?</p><p class="dim">Name the habit, then choose the good habits that replace it. Good habits can link to MIND, TRAINING, NUTRITION, LEARN and JOURNAL and tick themselves off when you log there.</p>
@@ -883,6 +894,108 @@ function sample(){
 
 /* ---------- events ---------- */
 /* ---------- settings: everything that used to sit in the footer, behind the header's SETTINGS button ---------- */
+/* ---------- daily review: a script to read over at the end of each day ----------
+   Built from the day's urges, slips and good habits (in the habit filter), the days before it, your notes and the
+   morning check-in. Plain sentences first, then the day in order, what went well, what to look at, and questions. */
+function rvDays(){return [...new Set(view(false).map(e=>e.day))].sort()}
+function rvDefault(){
+  const D=rvDays(),t=ymd(new Date());
+  return /^\d{4}-/.test(U.range)&&D.includes(U.range)?U.range:D.includes(t)?t:D.filter(d=>d<=t).at(-1)||D.at(-1);
+}
+function review(day){
+  const now=Date.now(),isT=day===ymd(new Date()),d0=pd(day),end=Math.min(new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()+1).getTime(),now);
+  const all=view(false).filter(e=>e.at<end),T=all.filter(e=>e.day===day),s=stats(T),A=stats(all);
+  const Ug=T.filter(e=>e.t!=='done'),R=Ug.filter(e=>e.t==='resist'),L=Ug.filter(e=>e.t==='slip'),hb=U.h==='all'?null:badOf(U.h);
+  const pl=(k,w)=>`${k} ${w}${k===1?'':'s'}`,hm=ms=>new Date(ms).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null,f1=v=>v.toFixed(1),nm=e=>esc(badOf(e.b)?.name||'Habit');
+  const sec=(h,b)=>b?`<section class="rv"><h4>${h}</h4>${b}</section>`:'',li=a=>`<ul>${a.map(x=>`<li>${x}</li>`).join('')}</ul>`;
+  const and=a=>a.length>1?a.slice(0,-1).join(', ')+' and '+a.at(-1):a[0]||'',an1=n=>n===8?'an':'a';
+  const the=isT?'today':'that day';
+  // the day: urges against slips, the streak at the end of it, good habits against their targets, what it saved
+  const ids=U.h==='all'?S.bad.map(b=>b.id):[U.h],st=streak(ids,end),cur=Math.max(0,st.cur),cd=Math.floor(cur/DAY);
+  const G=S.good.map(g=>({g,n:T.filter(e=>isDone(e)&&e.g===g.name).length,tg:g.target||1})),hit=G.filter(x=>x.n>=x.tg),miss=G.filter(x=>x.n<x.tg);
+  const sv=[s.saved.$?money(s.saved.$,'$'):'',s.saved.min?money(s.saved.min,'min'):''].filter(Boolean).join(' and ');
+  let out=sec('The day',`<p>${isT?'So far today':`On <b>${d0.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</b>`}${hb?` (${esc(hb.name)})`:''} you logged `+
+    (Ug.length?`${pl(Ug.length,'urge')}: <b class="pos">${R.length||'none'} beaten</b> and ${L.length?`<b class="neg">${pl(L.length,'slip')}</b>`:'no slips'}. `+
+      (L.length?R.length?`A slip is data, not a failure, and you still beat ${pl(R.length,'urge')}.`:'A slip is data, not a failure. Look at what led to it.':'A clean day.')
+    :`no urges${S.bad.length?'. A clean day.':'.'}`)+`</p>`+
+    (st.goal&&cur?`<p>${isT?'Your clean streak stands at':'At the end of the day your clean streak was'} <b>${cd?pl(cd,'day'):span(cur)}</b>, against a goal of ${st.goal} days.</p>`:'')+
+    (G.length?`<p>Good habits: you hit the target on <b>${hit.length} of ${G.length}</b>${s.done?` (${pl(s.done,'check-off')} in all)`:''}.</p>`:'')+
+    (sv?`<p>Beating those urges saved you about <b class="pos">${sv}</b>.</p>`:''));
+  // in context: the previous 14 days (from the first day in the log), this week, the goal
+  const P=[];for(let i=1;i<=14;i++){const k=ymd(new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()-i));if(!all.length||k<all[0].day)break;P.push(k)}
+  const an=P.length?avg(P.map(k=>(A.D[k]?.r||0)+(A.D[k]?.s||0))):null,PI=all.filter(e=>e.int!=null&&e.t!=='done'&&P.includes(e.day)).map(e=>e.int),ui=avg(PI),di=s.int;
+  const fewer=an!=null&&Ug.length<an-.5,more=an!=null&&Ug.length>an+.5,weaker=di!=null&&ui!=null&&di<ui-.5,stronger=di!=null&&ui!=null&&di>ui+.5;
+  const ws=(d=>{d.setDate(d.getDate()-d.getDay());return ymd(d)})(pd(day)),W=all.filter(e=>e.day>=ws&&e.t!=='done'),wr=W.filter(e=>e.t==='resist').length;
+  const left=st.goal?st.goal-cd:null;
+  out+=sec('In context',(P.length?`<p>You logged ${pl(Ug.length,'urge')} against an average of ${f1(an)} a day over the previous ${pl(P.length,'day')}: `+
+      (fewer?'<b class="pos">fewer than usual</b>, which is progress.':more?'<b>more than usual</b>.':'about your usual.')+
+      (di!=null&&ui!=null?` Their average strength was ${f1(di)}/10 against your usual ${f1(ui)}, ${weaker?'<b class="pos">weaker</b>':stronger?'<b>stronger</b>':'about the same'}.`:'')+`</p>`
+    :`<p>This is the first day in your log${hb?' for this habit':''}, so there's nothing to compare it with yet.</p>`)+
+    (W.length||left!=null?`<p>${W.length?`Week to date (since Sunday): you beat ${wr} of ${pl(W.length,'urge')} (${pct(wr,W.length)}). `:''}`+
+      (left==null?'':left>0?`${pl(left,'day')} to go to your ${st.goal}-day goal.`:`You've reached your ${st.goal}-day goal.`)+`</p>`:''));
+  // the day in order
+  const rows=T.map(e=>`<li>${hm(e.at)} · `+(e.t==='done'?`<b class="pos">Did ${esc(e.g)}</b>${doneDet(e)?' · '+esc(doneDet(e)):''}${e.src?` · via ${e.src}`:''}`
+    :`<b class="${e.t==='slip'?'neg':'pos'}">${e.t==='slip'?'Slipped':'Beat an urge'}</b> · ${nm(e)}${e.int!=null?` · strength ${e.int}/10`:''}${e.trig?` · ${esc(e.trig)}`:''}`)+
+    (e.t==='resist'&&e.g||e.note?`<span class="tr"> ${e.t==='resist'&&e.g?`swapped in ${esc(e.g)}`:''}${e.t==='resist'&&e.g&&e.note?' · ':''}${e.note?`<q>${esc(e.note)}</q>`:''}</span>`:'')+`</li>`).join('');
+  out+=sec('How it unfolded',T.length?`<ol>${rows}</ol>`:'');
+  // what went well / what to look at
+  const sw={};R.forEach(e=>{if(e.g)sw[e.g]=(sw[e.g]||0)+1});const top=Object.entries(sw).sort((a,b)=>b[1]-a[1])[0];
+  const swAll=top?all.filter(e=>e.t==='resist'&&e.g===top[0]).length:0,big=R.filter(e=>e.int>=7).sort((a,b)=>b.int-a.int)[0];
+  const tr={};Ug.forEach(e=>{if(e.trig)tr[e.trig]=(tr[e.trig]||0)+1});const tt=Object.entries(tr).sort((a,b)=>b[1]-a[1])[0];
+  const hx=Math.max(...A.hours),dh=hx?A.hours.indexOf(hx):null,inDh=dh==null?0:Ug.filter(e=>new Date(e.at).getHours()===dh).length;
+  const good=[],look=[];
+  if(R.length)good.push(`You beat ${pl(R.length,'urge')}${L.length?' on a day that also had a slip':''}.`);
+  if(big)good.push(`You rode out ${an1(big.int)} ${big.int}/10 urge at ${hm(big.at)}. The strong ones count most.`);
+  if(weaker)good.push(`Urges were weaker than usual (${f1(di)} vs ${f1(ui)}). The loop is losing its grip.`);
+  if(G.length&&!miss.length)good.push('You hit every good-habit target.');
+  if(S.bad.length&&!L.length&&Ug.length)good.push('A clean day: no slips.');
+  if(top&&top[1]>=2)good.push(`${esc(top[0])} got you through ${top[1]} urges.`);
+  else if(top&&swAll>=5)good.push(`${esc(top[0])} has now helped you beat ${swAll} urges.`);
+  L.forEach(e=>look.push(`Slipped at ${hm(e.at)} (${nm(e)}${e.trig?`, after ${esc(e.trig)}`:''}${e.int!=null?`, strength ${e.int}/10`:''})${e.note?` — <q>${esc(e.note)}</q>`:''}. What came just before it?`));
+  if(tt&&tt[1]>=2)look.push(`${esc(tt[0])} set off ${tt[1]} of the ${pl(Ug.length,'urge')}.`);
+  if(inDh)look.push(`${inDh===1?'One urge':inDh+' urges'} came in the ${hr(dh)} hour, your danger hour.`);
+  if(miss.length)look.push(`${isT?'Not done yet':'Missed'}: ${miss.map(x=>`${esc(x.g.name)} (${x.n} of ${x.tg})`).join(', ')}.`);
+  if(stronger)look.push(`Urges were stronger than usual (${f1(di)} vs ${f1(ui)}).`);
+  out+=sec('What went well',good.length?li(good):'<p>Nothing stands out in the numbers. Some days are about getting through, and that counts.</p>');
+  out+=sec('What to look at',look.length?li(look):'<p>No warning signs in the numbers.</p>');
+  // the morning check-in from TODAY, when there is one for this date
+  let ci=null;try{ci=(JSON.parse(localStorage.getItem('isx.checkin.v1'))?.log||[]).find(e=>e.day===day)}catch(e){}
+  if(ci){const Q=['','poor','restless','OK','good','great'],E=['','drained','low','steady','good','charged'],sh=ci.sleep!=null&&ci.sleep<7;
+    out+=sec('Your state',`<p>${ci.sleep!=null?`You slept <b>${ci.sleep} h</b> (${Q[ci.q]||'unrated'} sleep) and your`:'Your'} energy was <b>${E[ci.energy]||'unrated'}</b>.`+
+      (sh&&(more||L.length)?` Short sleep and ${L.length?'a slip':'more urges than usual'}: tired brains crave the old loop. Worth watching if it repeats.`
+       :!sh&&ci.sleep!=null&&!L.length&&Ug.length?' Rested, and no slips.':'')+`</p>`)}
+  out+=sec('Your notes',S.notes[day]?`<blockquote>${esc(S.notes[day])}</blockquote>`:'<p>No notes for this day yet.</p>');
+  // questions, most specific first
+  // ask about the danger hour when the trigger hit then today, else about the hour it did hit
+  const q=[],trq=(tt||Object.entries(tr)[0]||[])[0],hrs=[...L,...R].filter(e=>e.trig===trq).map(e=>new Date(e.at).getHours()),qh=hrs.includes(dh)?dh:hrs[0];
+  if(L.length)q.push(`What happened in the ten minutes before the ${hm(L[0].at)} slip? Where could you have stepped in?`);
+  if(trq)q.push(`What will you do instead next time ${esc(trq)} hits around ${hr(qh)}?`);
+  if(stronger)q.push(`Urges ran stronger ${the}. Was it sleep, stress, or something around you?`);
+  if(miss.length)q.push(`What got in the way of ${and(miss.map(x=>esc(x.g.name)))}? Could a smaller version fit tomorrow?`);
+  if(!L.length&&R.length){const b=big||R[0];q.push(`What helped most with the ${hm(b.at)} urge? How can you set that up again?`)}
+  q.push('One thing to keep doing tomorrow. One thing to change.');
+  out+=sec('Questions to answer',`<ol>${q.map(x=>`<li>${x}</li>`).join('')}</ol>`);
+  return out;
+}
+function reviewForm(day){
+  const D=rvDays();if(!D.length)return toast('Nothing to review yet');
+  day=D.includes(day)?day:rvDefault();const i=D.indexOf(day);
+  dlg.classList.add('rvd');dlg.addEventListener('close',()=>dlg.classList.remove('rvd'),{once:true});
+  dlg.innerHTML=`<div class="rvh"><h3>DAILY REVIEW // ${dlabel(day).toUpperCase()}</h3>
+    <button type="button" data-a="rvgo" data-v="${D[i-1]||''}" ${i>0?'':'disabled'} aria-label="Previous day">&lt;</button><button type="button" data-a="rvgo" data-v="${D[i+1]||''}" ${i<D.length-1?'':'disabled'} aria-label="Next day">&gt;</button></div>
+    <div id="rvb">${review(day)}</div>
+    <div class="fa2"><span><button type="button" data-a="rvcopy">COPY</button></span><button type="button" data-a="rvnote" data-v="${day}">WRITE NOTES</button><button type="button" class="pri" data-a="x">DONE</button></div>`;
+  if(!dlg.open)dlg.showModal();
+  dlg.scrollTop=0;
+}
+// plain text of the review, for pasting into a notes app
+function reviewText(){
+  const b=$('#rvb');if(!b)return '';
+  return [dlg.querySelector('.rvh h3').textContent,...[...b.querySelectorAll('.rv')].map(x=>[x.querySelector('h4').textContent.toUpperCase(),
+    ...[...x.children].slice(1).map(el=>el.matches('ol,ul')?[...el.children].map((li,i)=>`${el.matches('ol')?i+1+'.':'-'} ${li.textContent.replace(/\s+/g,' ').trim()}`).join('\n'):el.textContent.trim())].join('\n'))].join('\n\n');
+}
+
 function settingsForm(){
   dlg.innerHTML=`<h3>SETTINGS</h3>
   <div class="ui-set">
@@ -898,6 +1011,8 @@ const ACT={
   set:()=>settingsForm(),sync:()=>{dlg.close();document.getElementById('isx-sync')?.click()},
   urge:v=>R?draw():urgeForm(v),add:()=>entryForm(),habits:()=>habitsForm(),pick:v=>habitsForm(v),x:()=>dlg.close(),sample,csv:exportCSV,
   note:()=>noteForm(U.range in RANGES?ymd(new Date()):U.range),imp:()=>$('#file').click(),
+  review:()=>reviewForm(rvDefault()),rvgo:v=>v&&reviewForm(v),rvnote:v=>{dlg.classList.remove('rvd');dlg.close();noteForm(v)},
+  rvcopy:()=>{const t=reviewText();(navigator.clipboard?.writeText(t)||Promise.reject()).then(()=>toast('Review copied'),()=>toast('Copy failed — select the text instead'))},
   done:v=>doneForm(S.good.find(x=>x.name===v)||{name:v,target:1}),
   bak:()=>dl(`rewire-backup-${ymd(new Date())}.json`,JSON.stringify(S),'application/json'),
   clear:()=>{if(confirm('Delete ALL habits, entries and notes on this device?')){S={bad:[],good:[],log:[],notes:{}};save();U.range='all';U.h='all';boot()}},
