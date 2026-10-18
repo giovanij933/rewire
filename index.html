@@ -564,8 +564,11 @@ function today(){
    <div class="calf"><span class="dim">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}</span><button data-a="habits">EDIT HABITS</button></div></div>`;
 }
 
+// the log's columns, for sorting and filtering (UI.filter); the last column holds the row's buttons
+const LOGC=[{label:'Time (local)',get:e=>e.at,type:'time'},{label:'Event',get:e=>e.t==='done'?'Good':e.t==='slip'?'Slip':'Beat urge'},{label:'Breaking',get:e=>e.b?badOf(e.b)?.name:null},
+  {label:'Good habit',get:e=>e.g},{label:'Urge',get:e=>e.int,type:'num'},{label:'Trigger',get:e=>e.trig},{label:'Note',get:e=>e.note},null];
 function table(T){
-  const rows=[...T].reverse(),pages=Math.max(1,Math.ceil(rows.length/PAGE)),na='<span class="dim">—</span>';
+  const F=UI.filter('log',LOGC,()=>{U.page=0;render()}),rows=F.apply([...T].reverse()),pages=Math.max(1,Math.ceil(rows.length/PAGE)),na='<span class="dim">—</span>';
   U.page=Math.min(Math.max(U.page,0),pages-1);
   const what=e=>e.t==='done'?`<b class="pos">GOOD</b>${e.src?` <span class="dim">· ${e.src}</span>`:''}`:e.t==='slip'?`<b class="neg">SLIP</b>`:`<b class="pos">BEAT URGE</b>`;
   const body=rows.slice(U.page*PAGE,(U.page+1)*PAGE).map(e=>`<tr>
@@ -574,9 +577,9 @@ function table(T){
    <td class="dim" title="${esc(e.note)}">${esc((e.note||'').length>40?e.note.slice(0,39)+'…':e.note||'')}</td>
    <td class="r">${e.ro?`<a class="btn sm" href="${appUrl(e.src)}" target="_blank" rel="noopener" data-app="${e.src}">${e.src}</a>`:`<button data-a="edit" data-v="${e.id}">EDIT</button> <button data-a="del" data-v="${e.id}" aria-label="Delete entry">X</button>`}</td></tr>`).join('');
   return `<div class="card"><div class="rowh"><p class="h">Log</p><button data-a="csv">EXPORT CSV</button></div>
-  <div class="tw" tabindex="0" role="region" aria-label="Table"><table><thead><tr><th>Time (local)</th><th>Event</th><th>Breaking</th><th>Good habit</th><th class="r">Urge</th><th>Trigger</th><th>Note</th><th><span class="ui-sr">Actions</span></th></tr></thead>
+  <div class="tw" tabindex="0" role="region" aria-label="Table"><table><thead><tr><th>${F.th(0)}</th><th>${F.th(1)}</th><th>${F.th(2)}</th><th>${F.th(3)}</th><th class="r">${F.th(4)}</th><th>${F.th(5)}</th><th>${F.th(6)}</th><th><span class="ui-sr">Actions</span></th></tr></thead>
   <tbody>${body||'<tr><td colspan="8" class="dim">Nothing in this view_</td></tr>'}</tbody></table></div>
-  <div class="calf"><div><button data-a="pp">&lt;</button> Page <b>${U.page+1}</b> of ${pages} <button data-a="pn">&gt;</button></div><span class="dim">${rows.length} record${rows.length===1?'':'s'}</span></div></div>`;
+  <div class="calf"><div><button data-a="pp">&lt;</button> Page <b>${U.page+1}</b> of ${pages} <button data-a="pn">&gt;</button></div><span class="dim">${rows.length} record${rows.length===1?'':'s'}${F.clear()}</span></div></div>`;
 }
 
 function render(){
