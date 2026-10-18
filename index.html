@@ -915,25 +915,25 @@ function review(day){
   const ids=U.h==='all'?S.bad.map(b=>b.id):[U.h],st=streak(ids,end),cur=Math.max(0,st.cur),cd=Math.floor(cur/DAY);
   const G=S.good.map(g=>({g,n:T.filter(e=>isDone(e)&&e.g===g.name).length,tg:g.target||1})),hit=G.filter(x=>x.n>=x.tg),miss=G.filter(x=>x.n<x.tg);
   const sv=[s.saved.$?money(s.saved.$,'$'):'',s.saved.min?money(s.saved.min,'min'):''].filter(Boolean).join(' and ');
-  let out=sec('The day',`<p>${isT?'So far today':`On <b>${d0.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</b>`}${hb?` (${esc(hb.name)})`:''} you logged `+
+  let out=sec('The day',`<p>${isT?'So far today':`On <b>${d0.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</b>`}${hb?` (${esc(hb.name)})`:''} I logged `+
     (Ug.length?`${pl(Ug.length,'urge')}: <b class="pos">${R.length||'none'} beaten</b> and ${L.length?`<b class="neg">${pl(L.length,'slip')}</b>`:'no slips'}. `+
-      (L.length?R.length?`A slip is data, not a failure, and you still beat ${pl(R.length,'urge')}.`:'A slip is data, not a failure. Look at what led to it.':'A clean day.')
+      (L.length?R.length?`A slip is data, not a failure, and I still beat ${pl(R.length,'urge')}.`:'A slip is data, not a failure. I\'ll look at what led to it.':'A clean day.')
     :`no urges${S.bad.length?'. A clean day.':'.'}`)+`</p>`+
-    (st.goal&&cur?`<p>${isT?'Your clean streak stands at':'At the end of the day your clean streak was'} <b>${cd?pl(cd,'day'):span(cur)}</b>, against a goal of ${st.goal} days.</p>`:'')+
-    (G.length?`<p>Good habits: you hit the target on <b>${hit.length} of ${G.length}</b>${s.done?` (${pl(s.done,'check-off')} in all)`:''}.</p>`:'')+
-    (sv?`<p>Beating those urges saved you about <b class="pos">${sv}</b>.</p>`:''));
+    (st.goal&&cur?`<p>${isT?'My clean streak stands at':'At the end of the day my clean streak was'} <b>${cd?pl(cd,'day'):span(cur)}</b>, against a goal of ${st.goal} days.</p>`:'')+
+    (G.length?`<p>Good habits: I hit the target on <b>${hit.length} of ${G.length}</b>${s.done?` (${pl(s.done,'check-off')} in all)`:''}.</p>`:'')+
+    (sv?`<p>Beating those urges saved me about <b class="pos">${sv}</b>.</p>`:''));
   // in context: the previous 14 days (from the first day in the log), this week, the goal
   const P=[];for(let i=1;i<=14;i++){const k=ymd(new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()-i));if(!all.length||k<all[0].day)break;P.push(k)}
   const an=P.length?avg(P.map(k=>(A.D[k]?.r||0)+(A.D[k]?.s||0))):null,PI=all.filter(e=>e.int!=null&&e.t!=='done'&&P.includes(e.day)).map(e=>e.int),ui=avg(PI),di=s.int;
   const fewer=an!=null&&Ug.length<an-.5,more=an!=null&&Ug.length>an+.5,weaker=di!=null&&ui!=null&&di<ui-.5,stronger=di!=null&&ui!=null&&di>ui+.5;
   const ws=(d=>{d.setDate(d.getDate()-d.getDay());return ymd(d)})(pd(day)),W=all.filter(e=>e.day>=ws&&e.t!=='done'),wr=W.filter(e=>e.t==='resist').length;
   const left=st.goal?st.goal-cd:null;
-  out+=sec('In context',(P.length?`<p>You logged ${pl(Ug.length,'urge')} against an average of ${f1(an)} a day over the previous ${pl(P.length,'day')}: `+
-      (fewer?'<b class="pos">fewer than usual</b>, which is progress.':more?'<b>more than usual</b>.':'about your usual.')+
-      (di!=null&&ui!=null?` Their average strength was ${f1(di)}/10 against your usual ${f1(ui)}, ${weaker?'<b class="pos">weaker</b>':stronger?'<b>stronger</b>':'about the same'}.`:'')+`</p>`
-    :`<p>This is the first day in your log${hb?' for this habit':''}, so there's nothing to compare it with yet.</p>`)+
-    (W.length||left!=null?`<p>${W.length?`Week to date (since Sunday): you beat ${wr} of ${pl(W.length,'urge')} (${pct(wr,W.length)}). `:''}`+
-      (left==null?'':left>0?`${pl(left,'day')} to go to your ${st.goal}-day goal.`:`You've reached your ${st.goal}-day goal.`)+`</p>`:''));
+  out+=sec('In context',(P.length?`<p>I logged ${pl(Ug.length,'urge')} against an average of ${f1(an)} a day over the previous ${pl(P.length,'day')}: `+
+      (fewer?'<b class="pos">fewer than usual</b>, which is progress.':more?'<b>more than usual</b>.':'about my usual.')+
+      (di!=null&&ui!=null?` Their average strength was ${f1(di)}/10 against my usual ${f1(ui)}, ${weaker?'<b class="pos">weaker</b>':stronger?'<b>stronger</b>':'about the same'}.`:'')+`</p>`
+    :`<p>This is the first day in my log${hb?' for this habit':''}, so there's nothing to compare it with yet.</p>`)+
+    (W.length||left!=null?`<p>${W.length?`Week to date (since Sunday): I beat ${wr} of ${pl(W.length,'urge')} (${pct(wr,W.length)}). `:''}`+
+      (left==null?'':left>0?`${pl(left,'day')} to go to my ${st.goal}-day goal.`:`I've reached my ${st.goal}-day goal.`)+`</p>`:''));
   // the day in order
   const rows=T.map(e=>`<li>${hm(e.at)} · `+(e.t==='done'?`<b class="pos">Did ${esc(e.g)}</b>${doneDet(e)?' · '+esc(doneDet(e)):''}${e.src?` · via ${e.src}`:''}`
     :`<b class="${e.t==='slip'?'neg':'pos'}">${e.t==='slip'?'Slipped':'Beat an urge'}</b> · ${nm(e)}${e.int!=null?` · strength ${e.int}/10`:''}${e.trig?` · ${esc(e.trig)}`:''}`)+
@@ -945,16 +945,16 @@ function review(day){
   const tr={};Ug.forEach(e=>{if(e.trig)tr[e.trig]=(tr[e.trig]||0)+1});const tt=Object.entries(tr).sort((a,b)=>b[1]-a[1])[0];
   const hx=Math.max(...A.hours),dh=hx?A.hours.indexOf(hx):null,inDh=dh==null?0:Ug.filter(e=>new Date(e.at).getHours()===dh).length;
   const good=[],look=[];
-  if(R.length)good.push(`You beat ${pl(R.length,'urge')}${L.length?' on a day that also had a slip':''}.`);
-  if(big)good.push(`You rode out ${an1(big.int)} ${big.int}/10 urge at ${hm(big.at)}. The strong ones count most.`);
+  if(R.length)good.push(`I beat ${pl(R.length,'urge')}${L.length?' on a day that also had a slip':''}.`);
+  if(big)good.push(`I rode out ${an1(big.int)} ${big.int}/10 urge at ${hm(big.at)}. The strong ones count most.`);
   if(weaker)good.push(`Urges were weaker than usual (${f1(di)} vs ${f1(ui)}). The loop is losing its grip.`);
-  if(G.length&&!miss.length)good.push('You hit every good-habit target.');
+  if(G.length&&!miss.length)good.push('I hit every good-habit target.');
   if(S.bad.length&&!L.length&&Ug.length)good.push('A clean day: no slips.');
-  if(top&&top[1]>=2)good.push(`${esc(top[0])} got you through ${top[1]} urges.`);
-  else if(top&&swAll>=5)good.push(`${esc(top[0])} has now helped you beat ${swAll} urges.`);
+  if(top&&top[1]>=2)good.push(`${esc(top[0])} got me through ${top[1]} urges.`);
+  else if(top&&swAll>=5)good.push(`${esc(top[0])} has now helped me beat ${swAll} urges.`);
   L.forEach(e=>look.push(`Slipped at ${hm(e.at)} (${nm(e)}${e.trig?`, after ${esc(e.trig)}`:''}${e.int!=null?`, strength ${e.int}/10`:''})${e.note?` — <q>${esc(e.note)}</q>`:''}. What came just before it?`));
   if(tt&&tt[1]>=2)look.push(`${esc(tt[0])} set off ${tt[1]} of the ${pl(Ug.length,'urge')}.`);
-  if(inDh)look.push(`${inDh===1?'One urge':inDh+' urges'} came in the ${hr(dh)} hour, your danger hour.`);
+  if(inDh)look.push(`${inDh===1?'One urge':inDh+' urges'} came in the ${hr(dh)} hour, my danger hour.`);
   if(miss.length)look.push(`${isT?'Not done yet':'Missed'}: ${miss.map(x=>`${esc(x.g.name)} (${x.n} of ${x.tg})`).join(', ')}.`);
   if(stronger)look.push(`Urges were stronger than usual (${f1(di)} vs ${f1(ui)}).`);
   out+=sec('What went well',good.length?li(good):'<p>Nothing stands out in the numbers. Some days are about getting through, and that counts.</p>');
@@ -962,18 +962,18 @@ function review(day){
   // the morning check-in from TODAY, when there is one for this date
   let ci=null;try{ci=(JSON.parse(localStorage.getItem('isx.checkin.v1'))?.log||[]).find(e=>e.day===day)}catch(e){}
   if(ci){const Q=['','poor','restless','OK','good','great'],E=['','drained','low','steady','good','charged'],sh=ci.sleep!=null&&ci.sleep<7;
-    out+=sec('Your state',`<p>${ci.sleep!=null?`You slept <b>${ci.sleep} h</b> (${Q[ci.q]||'unrated'} sleep) and your`:'Your'} energy was <b>${E[ci.energy]||'unrated'}</b>.`+
+    out+=sec('My state',`<p>${ci.sleep!=null?`I slept <b>${ci.sleep} h</b> (${Q[ci.q]||'unrated'} sleep) and my`:'My'} energy was <b>${E[ci.energy]||'unrated'}</b>.`+
       (sh&&(more||L.length)?` Short sleep and ${L.length?'a slip':'more urges than usual'}: tired brains crave the old loop. Worth watching if it repeats.`
        :!sh&&ci.sleep!=null&&!L.length&&Ug.length?' Rested, and no slips.':'')+`</p>`)}
-  out+=sec('Your notes',S.notes[day]?`<blockquote>${esc(S.notes[day])}</blockquote>`:'<p>No notes for this day yet.</p>');
+  out+=sec('My notes',S.notes[day]?`<blockquote>${esc(S.notes[day])}</blockquote>`:'<p>No notes for this day yet.</p>');
   // questions, most specific first
   // ask about the danger hour when the trigger hit then today, else about the hour it did hit
   const q=[],trq=(tt||Object.entries(tr)[0]||[])[0],hrs=[...L,...R].filter(e=>e.trig===trq).map(e=>new Date(e.at).getHours()),qh=hrs.includes(dh)?dh:hrs[0];
-  if(L.length)q.push(`What happened in the ten minutes before the ${hm(L[0].at)} slip? Where could you have stepped in?`);
-  if(trq)q.push(`What will you do instead next time ${esc(trq)} hits around ${hr(qh)}?`);
-  if(stronger)q.push(`Urges ran stronger ${the}. Was it sleep, stress, or something around you?`);
+  if(L.length)q.push(`What happened in the ten minutes before the ${hm(L[0].at)} slip? Where could I have stepped in?`);
+  if(trq)q.push(`What will I do instead next time ${esc(trq)} hits around ${hr(qh)}?`);
+  if(stronger)q.push(`Urges ran stronger ${the}. Was it sleep, stress, or something around me?`);
   if(miss.length)q.push(`What got in the way of ${and(miss.map(x=>esc(x.g.name)))}? Could a smaller version fit tomorrow?`);
-  if(!L.length&&R.length){const b=big||R[0];q.push(`What helped most with the ${hm(b.at)} urge? How can you set that up again?`)}
+  if(!L.length&&R.length){const b=big||R[0];q.push(`What helped most with the ${hm(b.at)} urge? How can I set that up again?`)}
   q.push('One thing to keep doing tomorrow. One thing to change.');
   out+=sec('Questions to answer',`<ol>${q.map(x=>`<li>${x}</li>`).join('')}</ol>`);
   return out;
