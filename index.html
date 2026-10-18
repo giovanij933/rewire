@@ -618,12 +618,12 @@ function render(){
  <div class="card"><p class="h">Danger hours</p><div class="k">Urges by hour of day</div><div class="big amb">${hr(danger)}</div>${stack(s.hours.map(v=>[[v,'fa']]))}<div class="hl"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11 PM</span></div></div>
 </section>
 <section class="g g3">
- <div class="card"><p class="h">Triggers</p><div class="k">What sets urges off</div>
-  ${s.trig.length?s.trig.slice(0,7).map(([k,v])=>`<div class="ev"><span>${esc(k)}</span><b>${v.n} <span class="${v.s?'neg':'dim'}">· ${pct(v.s,v.n)} slip</span></b></div><div class="hb"><i class="${v.s/v.n>.5?'bgn':'bga'}" style="width:${(v.n/s.trig[0][1].n*100).toFixed(1)}%"></i></div>`).join(''):ND}</div>
- <div class="card"><p class="h">Urge strength</p><div class="k">Average per day · lower is better</div><div class="big">${s.int==null?'—':s.int.toFixed(1)}</div>
-  ${line(dk.filter(k=>s.D[k].n).map(k=>r2(s.D[k].i/s.D[k].n)),'ca')}</div>
  <div class="card"><p class="h">Wins</p><div class="k">Urges beaten + good habits, cumulative</div><div class="big pos">${s.r+s.done}</div>
   ${line(dk.reduce((a,k)=>(a.push((a.at(-1)||0)+s.D[k].r+s.D[k].g),a),[]),'cg')}</div>
+ <div class="card"><p class="h">Urge strength</p><div class="k">Average per day · lower is better</div><div class="big">${s.int==null?'—':s.int.toFixed(1)}</div>
+  ${line(dk.filter(k=>s.D[k].n).map(k=>r2(s.D[k].i/s.D[k].n)),'ca')}</div>
+ <div class="card"><p class="h">Triggers</p><div class="k">What sets urges off</div>
+  ${s.trig.length?s.trig.slice(0,7).map(([k,v])=>`<div class="ev"><span>${esc(k)}</span><b>${v.n} <span class="${v.s?'neg':'dim'}">· ${pct(v.s,v.n)} slip</span></b></div><div class="hb"><i class="${v.s/v.n>.5?'bgn':'bga'}" style="width:${(v.n/s.trig[0][1].n*100).toFixed(1)}%"></i></div>`).join(''):ND}</div>
 </section>
 ${table(T)}
 <footer><p>Urges rise, peak and pass, usually within minutes. Surf them, swap in a good habit, and the old loop weakens each time. If a habit involves alcohol, drugs or gambling and feels out of your control, talk to a doctor or a support line — stopping some substances suddenly needs medical help.</p></footer>`;
