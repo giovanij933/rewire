@@ -873,6 +873,8 @@ function sample(){
     if(ago%2===0&&at(ago,7,30)<Date.now())S.log.push({id:uid(),at:at(ago,7,30),t:'done',g:'Drink water',note:''});
     if(ago%3!==1&&at(ago,12,15)<Date.now())S.log.push({id:uid(),at:at(ago,12,15),t:'done',g:'Walk 10 min',note:''});
   }
+  // very early in the morning nothing has happened yet today: log one beaten urge just before now
+  const e=Date.now()-15*6e4;if(e>=at(0,0,0)&&!S.log.some(x=>x.at>=at(0,0,0)))S.log.push({id:uid(),at:e,t:'resist',b:id,int:4,trig:'Late night',g:'Breathing reset',note:''});
   save();boot();
 }
 
