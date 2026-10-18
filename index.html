@@ -33,7 +33,7 @@ button:hover,select:hover{border-color:var(--amber);color:var(--amber)}
 .pri{background:var(--amber);border-color:var(--amber);color:#000;font-weight:600}
 .pri:hover{color:#000;filter:brightness(1.12)}
 .pos{color:var(--green)}.neg{color:var(--red)}.dim{color:var(--dim)}.amb{color:var(--amber)}
-.bgp{background:var(--green)}.bgn{background:var(--red)}.bgd{background:var(--line2)}
+.bgp{background:var(--green)}.bgn{background:var(--red)}.bgd{background:var(--line2)}.bgm{background:var(--dim)}
 .r{text-align:right}
 
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line)}
@@ -598,7 +598,7 @@ function render(){
 <section class="g g4">
  <div class="card"><p class="h">Clean streak</p><div class="k">Since last slip</div><div class="big pos">${S.bad.length?span(st.cur):'—'}</div>
   ${gauge([[gf,'sg']],st.goal?Math.round(gf*100)+'%':'—')}
-  ${lg('bgp','Current',span(st.cur))}${lg('bgd','Best',span(st.best))}${lg('bga','Goal',(st.goal||'—')+' days')}</div>
+  ${lg('bgp','Current',span(st.cur))}${lg('bgd','Best',span(st.best))}${lg('bgd','Goal',(st.goal||'—')+' days')}</div>
  <div class="card"><p class="h">Resist rate</p><div class="k">Urges logged</div><div class="big">${s.urges}</div>
   ${gauge([[s.urges?s.r/s.urges:0,'sg'],[s.urges?s.s/s.urges:0,'sr']],pct(s.r,s.urges))}
   ${lg('bgp','Beaten',s.r,pct(s.r,s.urges))}${lg('bgn','Slipped',s.s,pct(s.s,s.urges))}${lg('bgd','Clean days',s.cleanDays,pct(s.cleanDays,dk.length))}</div>
