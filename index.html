@@ -1071,6 +1071,7 @@ const ACT={
   clear:()=>{if(confirm('Delete ALL habits, entries and notes on this device?')){S={bad:[],good:[],log:[],notes:{}};save();U.range='all';U.h='all';U.x={};boot()}},
   prev:()=>shift(-1),next:()=>shift(1),tod:()=>{setMonth(Date.now());render()},
   day:v=>{U.range=U.range===v?'all':v;U.page=0;render()},
+  rng:v=>{U.range=U.range===v?'all':v;U.page=0;render()},   // the Today card's period tiles; tap again for all time
   xf:v=>{const i=v.indexOf(':'),k=v.slice(0,i);let x=v.slice(i+1);if(k==='hour'||k==='band')x=+x;
     if(U.x[k]===x)delete U.x[k];else U.x[k]=x;U.page=0;render()},
   xclr:k=>{if(k==='range')U.range='all';else delete U.x[k];U.page=0;render()},
@@ -1124,12 +1125,17 @@ addEventListener('message',e=>{if(e.origin===location.origin&&e.data&&e.data.isx
 function heroToday(){
   if(!S.bad.length)return '';
   const day=ms=>ymd(new Date(ms)),t=day(Date.now()),L=[...S.log,...LK].filter(e=>day(e.at)===t).sort((a,b)=>a.at-b.at);
-  const st=streak(S.bad.map(b=>b.id)),goal=st.goal||30,cleanD=Math.floor(st.cur/DAY);
-  const gd=S.good.reduce((a,g)=>a+Math.min(g.target||1,L.filter(e=>isDone(e)&&e.g===g.name).length),0),gt=S.good.reduce((a,g)=>a+(g.target||1),0);
-  const r=L.filter(e=>e.t==='resist').length,sl=L.filter(e=>e.t==='slip').length;
-  return UI.hero({key:'rewire',title:'Today',sub:`${S.bad.map(b=>b.name).join(' · ')}${sl?' · slipped today':''}`,
-    big:{value:span(st.cur),label:'clean',tone:sl?'neg':'pos'},   // red if you slipped today
-    rings:[{key:'clean',label:'Clean',value:cleanD,max:goal,display:`${cleanD}/${goal} days`},{key:'good',label:'Good habits',value:gd,max:Math.max(1,gt),display:`${gd}/${gt}`},{key:'urges',label:'Urges beaten',value:r,max:Math.max(1,r+sl),display:r+sl?`${r}/${r+sl}`:'none yet',done:r+sl>0&&!sl}],
+  const st=streak(S.bad.map(b=>b.id));
+  // each tile is the dashboard's own view for that range (all habits, like the rest of this card, and no card filters),
+  // so tapping it shows the same urges below; weeks start on Sunday, as the range filter has them
+  const per=k=>{const h=U.h,r=U.range;U.h='all';U.range=k;const s=stats(view(true,'*'));U.h=h;U.range=r;return s};
+  const td=per('today'),wk=per('week'),mo=per('month'),pl=(n,w)=>`${n} ${w}${n===1?'':'s'}`;
+  const tone=x=>x.s?'neg':x.r?'pos':'';   // green: urges beaten and no slips; red: any slip
+  const tile=(k,label,x,value,sub)=>({label,value,tone:tone(x),sub,attrs:{'data-a':'rng','data-v':k,'aria-label':`${label}: ${x.r} of ${pl(x.urges,'urge')} beaten, ${pl(x.s,'slip')}. Show ${label.toLowerCase()} below`},on:U.range===k});
+  return UI.hero({key:'rewire',title:'Today',sub:`Clean ${span(st.cur)} · goal ${st.goal||30} days`,
+    stats:[tile('today','Today',td,`${td.r} beaten`,`${pl(td.s,'slip')} · ${pl(td.done,'habit')} done`),
+      tile('week','Week',wk,pct(wk.r,wk.urges),wk.urges?`${wk.r} of ${pl(wk.urges,'urge')}`:'no urges yet'),
+      tile('month','Month',mo,pct(mo.r,mo.urges),pl(mo.s,'slip'))],
     action:{label:'Urge',attrs:{'data-a':'urge'}},
     log:L.map(e=>({at:e.at,tag:e.t==='slip'?'Slip':e.t==='resist'?'Urge beaten':'Good habit',text:e.t==='done'?`${e.g}${e.src?' · via '+e.src:''}`:`${badOf(e.b)?.name||''}${e.g?' → '+e.g:''}`,tone:e.t==='slip'?'neg':'pos'}))});
 }
