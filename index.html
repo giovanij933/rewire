@@ -477,7 +477,7 @@ const isDone=e=>e.t==='done'||(e.t==='resist'&&e.g&&!e.lk);
 
 /* ---------- numbers ---------- */
 function inRange(day){
-  const today=ymd(new Date()),wk=s=>{const d=pd(s);d.setDate(d.getDate()-d.getDay());return ymd(d)};
+  const today=ymd(new Date()),wk=s=>{const d=pd(s);d.setDate(d.getDate()-(d.getDay()+6)%7);return ymd(d)};
   return U.range==='all'||(U.range==='today'?day===today:U.range==='week'?wk(day)===wk(today):U.range==='month'?day.slice(0,7)===today.slice(0,7):day===U.range);
 }
 // urge strength bands, for the Urge strength card's filter
@@ -573,7 +573,7 @@ const kv=(k,v)=>`<div><span class="k">${k}</span><b>${v}</b></div>`;
 
 function calendar(){
   const D={};view(false).forEach(e=>{const d=D[e.day]??={r:0,s:0,g:0};if(e.t==='resist')d.r++;if(e.t==='slip')d.s++;if(isDone(e))d.g++});
-  const {y,m}=U.month,lead=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),rows=Math.ceil((lead+dim)/7),today=ymd(new Date());
+  const {y,m}=U.month,lead=(new Date(y,m,1).getDay()+6)%7,dim=new Date(y,m+1,0).getDate(),rows=Math.ceil((lead+dim)/7),today=ymd(new Date());
   let h='',cl=0,sl=0;
   for(let r=0;r<rows;r++){
     let wr=0,ws=0,wg=0;
@@ -582,14 +582,14 @@ function calendar(){
       if(d<1||d>dim){h+='<div class="cd off"></div>';continue}
       const k=`${y}-${pad(m+1)}-${pad(d)}`,x=D[k];
       if(x){wr+=x.r;ws+=x.s;wg+=x.g;if(x.s)sl++;else cl++}
-      h+=`<button class="cd${c%6?'':' we'}${x?x.s?' n':' p':''}${k===U.range?' sel':''}${k===today?' now':''}" data-a="day" data-v="${k}"><span>${d}${S.notes[k]?' <i class="amb">*</i>':''}</span>${x?`<b class="${x.s?'neg':'pos'}">${x.s?x.s+' slip'+(x.s>1?'s':''):'clean'}</b><em>${x.r} beat · ${x.g} good</em>`:''}</button>`;
+      h+=`<button class="cd${c<5?'':' we'}${x?x.s?' n':' p':''}${k===U.range?' sel':''}${k===today?' now':''}" data-a="day" data-v="${k}"><span>${d}${S.notes[k]?' <i class="amb">*</i>':''}</span>${x?`<b class="${x.s?'neg':'pos'}">${x.s?x.s+' slip'+(x.s>1?'s':''):'clean'}</b><em>${x.r} beat · ${x.g} good</em>`:''}</button>`;
     }
     h+=`<div class="cd wk">${wr+ws+wg?`<b class="${ws?'neg':'pos'}">${ws?ws+' slip'+(ws>1?'s':''):'clean'}</b><em>${wr} beat</em>`:'<em>—</em>'}</div>`;
   }
   return `<div class="card">
   <div class="rowh"><div><p class="h">Calendar</p><div class="k">Clean days this month</div><div class="big pos">${cl}</div></div>
    <div>Clean: <b class="pos">${cl}</b> &nbsp; Slip: <b class="neg">${sl}</b></div></div>
-  <div class="cal">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat','Week'].map(d=>`<div class="dw">${d}</div>`).join('')}${h}</div>
+  <div class="cal">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun','Week'].map(d=>`<div class="dw">${d}</div>`).join('')}${h}</div>
   <div class="calf"><div><button data-a="prev" aria-label="Previous month">&lt;</button> <b>${new Date(y,m,1).toLocaleDateString('en-US',{month:'long',year:'numeric'})}</b> <button data-a="next" aria-label="Next month">&gt;</button> <button data-a="tod">TODAY</button></div>
    <span class="dim">Tap a day to filter · * = note</span></div></div>`;
 }
@@ -979,13 +979,13 @@ function review(day){
   const P=[];for(let i=1;i<=14;i++){const k=ymd(new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()-i));if(!all.length||k<all[0].day)break;P.push(k)}
   const an=P.length?avg(P.map(k=>(A.D[k]?.r||0)+(A.D[k]?.s||0))):null,PI=all.filter(e=>e.int!=null&&e.t!=='done'&&P.includes(e.day)).map(e=>e.int),ui=avg(PI),di=s.int;
   const fewer=an!=null&&Ug.length<an-.5,more=an!=null&&Ug.length>an+.5,weaker=di!=null&&ui!=null&&di<ui-.5,stronger=di!=null&&ui!=null&&di>ui+.5;
-  const ws=(d=>{d.setDate(d.getDate()-d.getDay());return ymd(d)})(pd(day)),W=all.filter(e=>e.day>=ws&&e.t!=='done'),wr=W.filter(e=>e.t==='resist').length;
+  const ws=(d=>{d.setDate(d.getDate()-(d.getDay()+6)%7);return ymd(d)})(pd(day)),W=all.filter(e=>e.day>=ws&&e.t!=='done'),wr=W.filter(e=>e.t==='resist').length;
   const left=st.goal?st.goal-cd:null;
   out+=sec('In context',(P.length?`<p>I logged ${pl(Ug.length,'urge')} against an average of ${f1(an)} a day over the previous ${pl(P.length,'day')}: `+
       (fewer?'<b class="pos">fewer than usual</b>, which is progress.':more?'<b>more than usual</b>.':'about my usual.')+
       (di!=null&&ui!=null?` Their average strength was ${f1(di)}/10 against my usual ${f1(ui)}, ${weaker?'<b class="pos">weaker</b>':stronger?'<b>stronger</b>':'about the same'}.`:'')+`</p>`
     :`<p>This is the first day in my log${hb?' for this habit':''}, so there's nothing to compare it with yet.</p>`)+
-    (W.length||left!=null?`<p>${W.length?`Week to date (since Sunday): I beat ${wr} of ${pl(W.length,'urge')} (${pct(wr,W.length)}). `:''}`+
+    (W.length||left!=null?`<p>${W.length?`Week to date (since Monday): I beat ${wr} of ${pl(W.length,'urge')} (${pct(wr,W.length)}). `:''}`+
       (left==null?'':left>0?`${pl(left,'day')} to go to my ${st.goal}-day goal.`:`I've reached my ${st.goal}-day goal.`)+`</p>`:''));
   // the day in order
   const rows=T.map(e=>`<li>${hm(e.at)} · `+(e.t==='done'?`<b class="pos">Did ${esc(e.g)}</b>${doneDet(e)?' · '+esc(doneDet(e)):''}${e.src?` · via ${e.src}`:''}`
