@@ -1,5 +1,5 @@
 // Bump the version string whenever you change index.html so clients pick up the new shell.
-const CACHE = 'isx-rewire-v45';
+const CACHE = 'isx-rewire-v46';
 // all ISIONXXX apps share one site and one cache storage: only ever clear this app's own old caches
 const MINE = k => k.startsWith('isx-rewire-');
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './sync.js', './ui.js', './ui.css'];
