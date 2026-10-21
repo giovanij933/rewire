@@ -240,6 +240,16 @@ dialog.ss .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:0;ma
 dialog.ss .seg button{border:0;border-right:1px solid var(--line2);padding:11px 2px;text-align:center;background:none;font-size:12px;transition:background-color .18s,color .18s}
 dialog.ss .seg button:last-child{border-right:0}
 dialog.ss .seg button.on{background:var(--amber);color:#000}
+/* the urge form's guesses: what it pre-filled from your log, and the swap it suggests */
+dialog.ss .pf{margin:0 0 20px;padding:10px 12px;border:1px solid rgba(255,176,0,.3);border-radius:var(--g-r3);background:rgba(255,176,0,.05);font-size:12px;line-height:1.5}
+dialog.ss .pf b{display:block;margin-bottom:2px;font-size:10px;font-weight:600;letter-spacing:.18em;color:var(--amber)}
+dialog.ss .sw{display:flex;gap:12px;align-items:baseline;margin:6px 0 16px;padding:0 4px;font-size:13px;line-height:1.5}
+dialog.ss .sw::before{content:'';flex:none;width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 10px rgba(255,176,0,.6)}
+dialog.ss .sw b{color:var(--amber);font-weight:600}dialog.ss .sw small{display:block;font-size:11px;color:var(--dim)}
+/* the Today card's danger-hour plan, lit up for a moment when TODAY's plan opens it */
+.trow.hi{animation:hi 2.6s ease-out}
+@keyframes hi{0%,35%{background:rgba(255,176,0,.1);box-shadow:-8px 0 0 rgba(255,176,0,.1),8px 0 0 rgba(255,176,0,.1)}}
+@media(prefers-reduced-motion:reduce){.trow.hi{animation:none;background:rgba(255,176,0,.07)}}
 h1.brand{margin:0}
 /* daily review: a script to read top to bottom */
 dialog.rvd{width:min(680px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
@@ -364,6 +374,7 @@ function logTo(g,d,at=Date.now(),id=uid()){
     s.log.push({id,at,ex:g.ex||'Walk',type:c?'C':'B',sets:c?0:(d.sets||1),reps:c?0:amt,load:0,dist:c?(d.dist||0):0,mins:c?amt:0,rpe:d.rpe??null,note});
     localStorage.setItem('isx.training.v1',JSON.stringify(s));
   }
+  UI.replan();   // the plan reads these apps too
 }
 const arr=x=>Array.isArray(x)?x:[];
 const detail=a=>a.filter(Boolean).map(String).join(' · ');
@@ -469,7 +480,7 @@ function load(){
   try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.log))return {bad:s.bad||[],good:s.good||[],log:s.log,notes:s.notes||{},lv:s.lv||0}}catch(e){}
   return {bad:[],good:[],log:[],notes:{}};
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Storage write failed — take a backup')}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Storage write failed — take a backup')}planReg()}
 function setMonth(ms){const d=new Date(ms);U.month={y:d.getFullYear(),m:d.getMonth()}}
 let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),3200)}
 const badOf=id=>S.bad.find(b=>b.id===id);
@@ -518,6 +529,68 @@ function stats(T){
   return {urges:U2.length,r:R.length,s:L.length,done:T.filter(isDone).length,saved,dk,D,hours,
     trig:Object.entries(tr).sort((a,b)=>b[1].n-a[1].n),int:avg(I),early:avg(I.slice(0,half)),late:avg(I.slice(half)),
     cleanDays:dk.filter(k=>!D[k].s).length};
+}
+
+/* ---------- patterns: your own log, read for the urge form, the Today card and TODAY's plan ----------
+   Urges within an hour of now pick the habit and its trigger, past surfs the length, past swaps the replacement, and
+   the last 30 days the danger hour. Each guess needs a few entries behind it: without them the usual defaults stay
+   and nothing claims a pattern. */
+const SURFM=[1,3,5,10];
+const urgesIn=days=>{const t=Date.now();return S.log.filter(e=>(e.t==='resist'||e.t==='slip')&&e.at>t-days*DAY&&e.at<=t&&badOf(e.b))};
+const near=(at,h)=>{const d=Math.abs(new Date(at).getHours()-h);return Math.min(d,24-d)<=1};
+// the clear favourite of a tally: a tie for first is no pattern
+const topOf=c=>{const o=Object.entries(c).sort((a,b)=>b[1]-a[1]);return o[0]&&!(o[1]&&o[1][1]===o[0][1])?{v:o[0][0],n:o[0][1]}:null};
+const most=(E,f)=>{const c={};E.forEach(e=>{const k=f(e);if(k)c[k]=(c[k]||0)+1});return topOf(c)};
+const daysAgo=t=>{const d=Math.round((new Date().setHours(0,0,0,0)-new Date(t).setHours(0,0,0,0))/DAY);return d<1?'today':d<2?'yesterday':d+' days ago'};
+// the urge form's guesses for hour h over the last 90 days: the habit (pickB, with several to choose from) when 3 or
+// more urges near this hour were mostly that one, its trigger when 3 or more were mostly that, and the surf length
+function pfill(b,h,pickB){
+  const N=urgesIn(90).filter(e=>near(e.at,h)),o={};
+  if(pickB&&S.bad.length>1){const m=most(N,e=>e.b);if(m&&m.n>=3)o.b={...m,of:N.length}}
+  const hb=o.b?.v||b,T=N.filter(e=>e.b===hb),t=most(T,e=>e.trig);
+  if(t&&t.n>=3)o.trig={...t,of:T.length};
+  o.mins=bestMins(hb);
+  return o;
+}
+// the surf length that beat the biggest share of urges (more surfs wins a tie). Only lengths with 3 surfs count, and
+// at least two must have them (one alone is just your habit, and the last one used stays); a dead heat is no pattern.
+// This habit's surfs first, then all of them.
+function bestMins(b){
+  const E=urgesIn(90).filter(e=>SURFM.includes(e.mins)),pick=E=>{const c={};E.forEach(e=>{const x=c[e.mins]??={v:e.mins,n:0,r:0};x.n++;if(e.t==='resist')x.r++});
+    const ok=Object.values(c).filter(x=>x.n>=3).sort((a,b)=>b.r/b.n-a.r/a.n||b.n-a.n),[x,y]=ok;return y&&x.r&&!(x.r*y.n===y.r*x.n&&x.n===y.n)?x:null};
+  return pick(E.filter(e=>e.b===b))||pick(E);
+}
+// the swap for an urge: the good habit you most often did within 3 h of beating this trigger (the swap logged with
+// the urge counts too), at least twice; else this habit's swap you did least recently (as of 'before': the day's plan
+// picks it as of this morning, so doing it doesn't move the plan on). L = the log plus linked ticks.
+function swapFor(b,trig,L,before=Infinity){
+  const names=new Set(S.good.map(g=>g.name)),t=Date.now()-90*DAY;
+  if(trig){
+    const R=L.filter(e=>e.t==='resist'&&e.b===b&&e.trig===trig&&e.at>t),D=L.filter(e=>e.t==='done'&&e.at>t),c={};
+    R.forEach(r=>{const s=new Set(r.g?[r.g]:[]);D.forEach(e=>{if(e.at>r.at&&e.at<=r.at+3*36e5)s.add(e.g)});s.forEach(g=>{if(names.has(g))c[g]=(c[g]||0)+1})});
+    const m=topOf(c);if(m&&m.n>=2)return {g:m.v,n:m.n,of:R.length,trig};
+  }
+  const reps=(badOf(b)?.reps||[]).filter(r=>names.has(r));if(!reps.length)return null;
+  const last=g=>L.reduce((a,e)=>e.g===g&&e.t!=='slip'&&e.at>a&&e.at<before?e.at:a,0);
+  const o=reps.map((g,i)=>({g,at:last(g),i})).sort((a,c)=>a.at-c.at||a.i-c.i)[0];
+  return {g:o.g,last:o.at,k:reps.length};
+}
+// why that swap, in a phrase (short: for the Today card's narrow row)
+const swapWhy=(sw,short)=>sw.n?short?`after ${sw.n} of ${sw.of} beaten ${esc(sw.trig)} urges`:`you did it after ${sw.n} of the ${sw.of} ${esc(sw.trig)} urges you beat`
+  :`${sw.k>1?short?'least recently done':'the swap you did least recently':'your swap'} · ${sw.last?'last done '+daysAgo(sw.last):'not done yet'}`;
+// the danger hour: the hour of the last 30 days with the most urges, a slip counting double. It needs 5 urges in all
+// and a score of 3 in that hour (a tie goes to the hour with the latest urge). Then the habit that hour is mostly
+// about, its usual trigger then and the swap to have ready (did: done today). done: today, from the hour before to the
+// hour after, no slip and either the swap done or an urge beaten (with no danger hour yet: the swap done today).
+function dangerPlan(L){
+  const E=urgesIn(30),sc=Array(24).fill(0),la=Array(24).fill(0),ho=e=>new Date(e.at).getHours();
+  E.forEach(e=>{const h=ho(e);sc[h]+=e.t==='slip'?2:1;la[h]=Math.max(la[h],e.at)});
+  const x=sc.reduce((a,v,i)=>v>sc[a]||v===sc[a]&&la[i]>la[a]?i:a,0),h=E.length>=5&&sc[x]>=3?x:null;
+  const H=h==null?E:E.filter(e=>ho(e)===h),lt=H.reduce((a,e)=>!a||e.at>a.at?e:a,null);
+  const d=new Date(),t0=new Date(d).setHours(0,0,0,0),b=most(H,e=>e.b)?.v||lt?.b||S.bad[0].id,trig=h==null?null:pfill(b,h).trig?.v||null,sw=swapFor(b,trig,L,t0);
+  const did=!!sw&&L.some(e=>e.at>=t0&&e.t!=='slip'&&e.g===sw.g),w0=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h-1).getTime(),W=L.filter(e=>e.at>=w0&&e.at<w0+3*36e5);
+  const done=h==null?did:!W.some(e=>e.t==='slip')&&W.some(e=>e.t==='resist'||!!sw&&e.t==='done'&&e.g===sw.g);
+  return {h,n:H.length,s:H.filter(e=>e.t==='slip').length,N:E.length,b,trig,sw,did,done};
 }
 
 /* ---------- svg ---------- */
@@ -602,11 +675,28 @@ function today(){
     const dl=D.slice(-3).map(e=>`<div class="dd">✓ ${new Date(e.at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}${doneDet(e)?' · '+esc(doneDet(e)):''}${e.note?` <span class="dim">— ${esc(e.note.length>48?e.note.slice(0,47)+'…':e.note)}</span>`:''}</div>`).join('');
     const lk=LINKS[g.link],none=lk&&!appRows(lk.app);
     return `<div class="trow"><div><b class="${n>=tg?'pos':''}">${esc(g.name)}</b><div class="dim">${n} / ${tg} today${n>=tg?' ✓':''}${lk?` · <span class="amb">via ${lk.app}</span>${none?' (no data here yet)':''}`:''}</div>${dl}</div>
-     <span class="tb">${!lk?`<button data-a="done" data-v="${esc(g.name)}">+ DONE</button>`:quickLog(g.link)?`<button data-a="done" data-v="${esc(g.name)}">+ DONE</button>`:`<button data-a="done" data-v="${esc(g.name)}">LOG IN ${lk.app}</button>`}</span></div>`}).join('');
+     <span class="tb">${doneBtn(g)}</span></div>`}).join('');
   return `<div class="card"><p class="h">Today</p>
-   <div class="sec first">Breaking</div>${bad||'<p class="dim">No habit to break yet_</p>'}
+   ${S.bad.length?`<div class="sec first">Danger hour</div>${planRow()}`:''}
+   <div class="sec${S.bad.length?'':' first'}">Breaking</div>${bad||'<p class="dim">No habit to break yet_</p>'}
    <div class="sec">Building</div>${good||'<p class="dim">No good habits yet_</p>'}
    <div class="calf"><span class="dim">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}</span><button data-a="habits">EDIT HABITS</button></div></div>`;
+}
+
+// a good habit's done button: REWIRE's own form, or the app it's saved in (x = extra attributes)
+const doneBtn=(g,x='')=>{const lk=LINKS[g.link];return `<button data-a="done" data-v="${esc(g.name)}"${x}>${lk&&!quickLog(g.link)?'LOG IN '+lk.app:'+ DONE'}</button>`};
+// the danger-hour plan: the hour your urges cluster at and the swap to have ready. TODAY's plan opens on it: act
+// 'plan' shows this row, act 'swap' presses its button.
+function planRow(){
+  const P=dangerPlan([...S.log,...LK]),g=P.sw&&S.good.find(x=>x.name===P.sw.g),bn=esc(badOf(P.b)?.name||''),pl=(n,w)=>`${n} ${w}${n===1?'':'s'}`,c=new Date().getHours();
+  const head=P.h==null?'No danger hour yet':c===P.h?`It's your danger hour: ${hr(P.h)}`:c===(P.h+23)%24?`Danger hour ahead: ${hr(P.h)}`:`${hr(P.h)} is your danger hour`;
+  const what=P.h!=null?`${pl(P.n,'urge')}${P.s?`, ${pl(P.s,'slip')}`:''} in that hour · last 30 days`
+    :P.N>=5?`${pl(P.N,'urge')} in the last 30 days, spread out: no hour stands out yet`
+    :`${P.N?`Only ${pl(P.N,'urge')} in the last 30 days. `:''}Log urges as they come and the hour they cluster at shows here`;
+  return `<div class="trow" id="plan"><div><b>${head}</b><div class="dim">${what}${P.done&&P.h!=null?' · <span class="pos">done today ✓</span>':''}</div>
+    <div class="dim">${!g?`Pick a good habit to swap in for ${bn}`:P.did?`<span class="pos">✓</span> <span class="amb">${esc(g.name)}</span> done today`
+      :`Have <span class="amb">${esc(g.name)}</span> ready${S.bad.length>1?` for ${bn}`:''} · ${swapWhy(P.sw,1)}`}</div></div>
+    <span class="tb">${g?doneBtn(g,' data-act="swap"'):'<button data-a="habits" data-act="swap">PICK ONE</button>'}</span></div>`;
 }
 
 // the log's columns, for sorting and filtering (UI.filter); the last column holds the row's buttons
@@ -797,43 +887,66 @@ function breath(ms){
 function clearRun(){clearInterval(RI);cancelAnimationFrame(RA);RI=0;R=null;try{localStorage.removeItem(RUN)}catch(e){}wake(false)}
 function draw(){clearInterval(RI);cancelAnimationFrame(RA);if(R.end)outcomeForm();else surfView();sheet();if(!dlg.open)dlg.showModal()}
 
+/* Pre-filled from your patterns (pfill): with several habits, the one your urges near this hour are mostly about;
+   its usual trigger now; the surf length that has worked best (else the last one used). bid = the habit you tapped,
+   which stays. A field you change keeps your choice when you switch habits; the note lists only guesses still in place.
+   The suggested swap follows the habit and trigger, and becomes the surf's {rep}. */
 function urgeForm(bid){
   if(!S.bad.length)return habitsForm();
   const pref=(()=>{try{return JSON.parse(localStorage.getItem(RUN+'.pref'))||{}}catch(e){return {}}})();
-  let b=bid||(U.h!=='all'?U.h:S.bad[0].id);
+  const h=new Date().getHours(),L=[...S.log,...LK],b0=bid||(U.h!=='all'?U.h:S.bad[0].id),own={};
+  let P=pfill(b0,h,!bid),b=P.b?.v||b0,mins=P.mins?.v||pref.mins||3,sw=null;
   dlg.innerHTML=`<form id="uf"><h3>URGE</h3>
+   <p class="pf" id="pf" hidden></p>
    ${S.bad.length>1?`<span class="k">Which habit</span><div class="vl" id="ub">${S.bad.map(x=>`<button type="button" data-b="${x.id}"${x.id===b?' class="on"':''}>${esc(x.name)}<em>${span(streak([x.id]).cur)} clean</em></button>`).join('')}</div>`:''}
    ${rpick('int','How strong is it? (1–10)')}
-   <span class="k">What set it off?</span>${cpick('trig',TRIG)}
+   <span class="k">What set it off?</span>${cpick('trig',TRIG,P.trig?.v)}
    <span class="k">Surf it for</span>
-   <div class="seg" id="ul">${[1,3,5,10].map(m=>`<button type="button" data-m="${m}"${m===(pref.mins||3)?' class="on"':''}>${m} min</button>`).join('')}</div>
+   <div class="seg" id="ul">${SURFM.map(m=>`<button type="button" data-m="${m}"${m===mins?' class="on"':''}>${m} min</button>`).join('')}</div>
+   <div id="sw" hidden></div>
    <p class="dim">Most urges peak and fade within minutes. Breathe with the bubble and let it pass.</p>
    <div class="fa2"><button type="button" class="ghost" data-a="x">CANCEL</button><button type="button" id="us">I ALREADY SLIPPED</button><button class="pri">SURF IT</button></div></form>`;
-  const f=$('#uf');let mins=pref.mins||3;
+  const f=$('#uf'),pick=(sel,on)=>f.querySelectorAll(sel).forEach(y=>y.classList.toggle('on',on(y)));
+  const paint=()=>{
+    const trig=cval('trig'),p=[P.b&&P.b.v===b&&`${esc(badOf(b).name)} (${P.b.n} of ${P.b.of} urges)`,P.trig&&P.trig.v===trig&&`${esc(trig)} (${P.trig.n} of ${P.trig.of}${P.b&&P.b.v===b?'':' urges'})`].filter(Boolean);
+    const m=P.mins&&P.mins.v===mins?`${mins}-min surfs: ${P.mins.r} of ${P.mins.n} beaten`:'',pf=$('#pf');
+    pf.hidden=!p.length&&!m;pf.innerHTML=`<b>PRE-FILLED FROM YOUR PATTERNS</b>${[p.length?`Around ${hr(h)}: ${p.join(' · ')}`:'',m].filter(Boolean).join(' · ')}`;
+    sw=swapFor(b,trig,L);$('#sw').hidden=!sw;
+    if(sw)$('#sw').innerHTML=`<span class="k">Then swap in</span><p class="sw"><span><b>${esc(sw.g)}</b>${swapApp(sw.g)?` <span class="dim">· ${swapApp(sw.g)}</span>`:''}<small>${swapWhy(sw)}</small></span></p>`;
+  };
   f.addEventListener('click',ev=>{
     const x=ev.target.closest('[data-b]'),m=ev.target.closest('[data-m]');
-    if(x){b=x.dataset.b;f.querySelectorAll('[data-b]').forEach(y=>y.classList.toggle('on',y===x))}
-    if(m){mins=+m.dataset.m;f.querySelectorAll('[data-m]').forEach(y=>y.classList.toggle('on',y===m))}
+    if(ev.target.closest('[data-c=trig] [data-cv]'))own.trig=1;
+    if(x&&x.dataset.b!==b){b=x.dataset.b;pick('[data-b]',y=>y===x);
+      P={...pfill(b,h,false),b:P.b};
+      if(!own.trig){const t=P.trig?.v;pick('[data-c=trig] [data-cv]',y=>y.dataset.cv===t)}
+      if(!own.mins){mins=P.mins?.v||pref.mins||3;pick('[data-m]',y=>+y.dataset.m===mins)}
+      paint()}
+    if(m){own.mins=1;mins=+m.dataset.m;pick('[data-m]',y=>y===m);paint()}
   });
+  f.addEventListener('input',paint);paint();
   $('#us').onclick=()=>{
-    const now=Date.now();R={b,int:rval('int'),trig:cval('trig'),mins,t0:now,end:now,slipped:true};keepRun();draw();
+    const now=Date.now();R={b,int:rval('int'),trig:cval('trig'),t0:now,end:now,slipped:true};keepRun();draw();
   };
   f.onsubmit=ev=>{
     ev.preventDefault();
     try{localStorage.setItem(RUN+'.pref',JSON.stringify({mins}))}catch(e){}
-    R={b,int:rval('int'),trig:cval('trig'),mins,t0:Date.now(),end:null,rep:badOf(b).reps[0]||null};
+    R={b,int:rval('int'),trig:cval('trig'),mins,t0:Date.now(),end:null,rep:sw?.g||badOf(b).reps[0]||null,sug:sw?.g||null};
     bell(1);keepRun();draw();
   };
   sheet();dlg.showModal();
 }
+// the swaps offered in a surf and after it: the habit's own, plus the suggested one; marked where it came from
+const swaps=h=>[...new Set([...(h?.reps||[]),R.sug].filter(Boolean))];
+const swapEm=n=>[n===R.sug?'suggested':'',swapApp(n)].filter(Boolean).join(' · ');
 function surfView(){
-  const h=badOf(R.b),reps=h?.reps||[];
+  const h=badOf(R.b),reps=swaps(h);
   dlg.innerHTML=`<div><h3>SURF // ${esc(h?.name||'').toUpperCase()}</h3>
   <div class="bub" id="bub"><svg viewBox="0 0 240 240" aria-hidden="true"><circle class="rt" cx="120" cy="120" r="118"/><circle class="rp" id="pg" cx="120" cy="120" r="118" pathLength="100" stroke-dasharray="0 100"/></svg>
    <div class="ball" id="ball"></div><div class="cue" id="pc" aria-live="polite"></div></div>
   <p class="gp" id="gp"></p>
   <div class="clock" id="clk"></div>
-  ${reps.length?`<span class="k">Then swap in</span><div class="vl" id="sr">${reps.map(r=>`<button type="button" data-sr="${esc(r)}"${r===R.rep?' class="on"':''}>${esc(r)}${swapApp(r)?`<em>${swapApp(r)}</em>`:''}</button>`).join('')}</div>`:''}
+  ${reps.length?`<span class="k">Then swap in</span><div class="vl" id="sr">${reps.map(r=>`<button type="button" data-sr="${esc(r)}"${r===R.rep?' class="on"':''}>${esc(r)}${swapEm(r)?`<em>${swapEm(r)}</em>`:''}</button>`).join('')}</div>`:''}
   <div class="fa2"><button type="button" id="sl">I SLIPPED</button><button type="button" class="pri" id="sd">IT PASSED</button></div></div>`;
   const len=R.mins*60000,P=SURF.map(p=>p.replace('{why}',h?.why||'you want this.').replace('{rep}',R.rep||'something good for you'));
   const tick=()=>{
@@ -850,11 +963,11 @@ function surfView(){
   RI=setInterval(tick,250);tick();wake(true);
 }
 function outcomeForm(){
-  const h=badOf(R.b),reps=h?.reps||[];
+  const h=badOf(R.b),reps=swaps(h);
   dlg.innerHTML=`<form id="of"><h3>${R.slipped?'SLIPPED':'URGE PASSED'} // ${esc(h?.name||'').toUpperCase()}</h3>
    ${R.slipped?`<p class="dim">A slip is data, not a verdict. Note what happened. The streak restarts now, and the next urge is a fresh chance.</p>`
    :`<p class="pos">You rode it out${R.end>R.t0?` in ${fm((R.end-R.t0)/60000)}`:''}. Each time, the loop gets weaker.</p>
-     ${reps.length?`<span class="k">Swap you did</span>${cpick('rep',reps,R.rep,swapApp)}`:''}`}
+     ${reps.length?`<span class="k">Swap you did</span>${cpick('rep',reps,R.rep,swapEm)}`:''}`}
    ${R.int==null?rpick('int','How strong was it? (1–10)'):''}
    ${R.trig?'':`<span class="k">What set it off?</span>${cpick('trig',TRIG)}`}
    <label>Note<textarea name="note" rows="3" placeholder="${R.slipped?'Where, when, what would help next time.':'What helped.'}"></textarea></label>
@@ -869,7 +982,8 @@ function outcomeForm(){
   oo&&(oo.onclick=()=>{const l=lkOf(cval('rep'));f.requestSubmit();if(l)openApp(l.app)});
   f.onsubmit=ev=>{
     ev.preventDefault();
-    const e={id:uid(),at:R.t0,t:R.slipped?'slip':'resist',b:R.b,int:R.int??rval('int'),trig:R.trig??cval('trig'),note:f.elements.note.value.trim()};
+    // mins: how long the surf was set for (not kept when you'd already slipped), for the next urge's surf length
+    const e={id:uid(),at:R.t0,t:R.slipped?'slip':'resist',b:R.b,int:R.int??rval('int'),trig:R.trig??cval('trig'),...(R.mins?{mins:R.mins}:{}),note:f.elements.note.value.trim()};
     if(!R.slipped){const g=cval('rep');if(g)e.g=g;if(g&&LINKS[S.good.find(x=>x.name===g)?.link])e.lk=1}
     S.log.push(e);save();clearRun();dlg.close();setMonth(e.at);render();
     toast(e.t==='slip'?'Logged. Next urge, fresh start.':`Urge beaten${h?.cost?` · ${money(+h.cost,h.unit)} saved`:''}`);
@@ -929,19 +1043,22 @@ function sample(){
   S.bad=[{id,name:'Doomscrolling',why:'Sleep earlier and actually finish books.',cost:20,unit:'min',goal:30,start:at(27,8,0),reps:['Read 5 pages','Walk 10 min','Breathing reset']}];
   S.good=[{name:'Read 5 pages',target:1},{name:'Walk 10 min',target:1},{name:'Breathing reset',target:2},{name:'Drink water',target:3},{name:'Meditate',target:1,link:'meditate'},{name:'Workout',target:1,link:'workout'}];
   S.good.forEach(g=>{if(!g.link)Object.assign(g,guess(g.name)||{})});S.lv=2;   // sample ticks stay here: never write demo data into the other apps
-  const T=['Boredom','Late night','Phone in hand','Work break','Tired','Stress'];
+  // each time of day has its usual triggers and the swap that tends to follow; the two slips came after 3-minute surfs
+  const T={22:['Late night','Phone in hand','Late night','Tired'],13:['Work break','Boredom','Work break','Stress'],8:['Phone in hand','Boredom','Phone in hand'],17:['Tired','Stress','Boredom']};
+  const SW={22:'Read 5 pages',13:'Walk 10 min',8:'Breathing reset',17:'Walk 10 min'},reps=S.bad[0].reps;
   for(let ago=27;ago>=0;ago--){
     const n=ago>18?4:ago>9?3:2;
     for(let i=0;i<n;i++){
-      const h=[22,13,8,17][i],int=Math.max(2,Math.min(9,Math.round(8-(27-ago)*.18+((ago*7+i*3)%5-2)*.6)));
+      const h=[22,13,8,17][i];if(h===13&&ago%5===4)continue;   // some days have no midday urge: late night is the peak
+      const int=Math.max(2,Math.min(9,Math.round(8-(27-ago)*.18+((ago*7+i*3)%5-2)*.6)));
       const slip=(ago===25&&i===0)||(ago===19&&i===0),t=at(ago,h,(ago*13+i*17)%60);if(t>Date.now())continue;
-      S.log.push({id:uid(),at:t,t:slip?'slip':'resist',b:id,int,trig:T[(ago+i*2)%T.length],note:'',...(slip?{}:{g:['Read 5 pages','Walk 10 min','Breathing reset'][(ago+i)%3]})});
+      S.log.push({id:uid(),at:t,t:slip?'slip':'resist',b:id,int,trig:T[h][(ago+i)%T[h].length],mins:slip?3:[5,3,5,10,5][(ago+i)%5],note:'',...(slip?{}:{g:ago%4===3?reps[(ago+i)%3]:SW[h]})});
     }
     if(ago%2===0&&at(ago,7,30)<Date.now())S.log.push({id:uid(),at:at(ago,7,30),t:'done',g:'Drink water',note:''});
     if(ago%3!==1&&at(ago,12,15)<Date.now())S.log.push({id:uid(),at:at(ago,12,15),t:'done',g:'Walk 10 min',note:''});
   }
   // very early in the morning nothing has happened yet today: log one beaten urge just before now
-  const e=Date.now()-15*6e4;if(e>=at(0,0,0)&&!S.log.some(x=>x.at>=at(0,0,0)))S.log.push({id:uid(),at:e,t:'resist',b:id,int:4,trig:'Late night',g:'Breathing reset',note:''});
+  const e=Date.now()-15*6e4;if(e>=at(0,0,0)&&!S.log.some(x=>x.at>=at(0,0,0)))S.log.push({id:uid(),at:e,t:'resist',b:id,int:4,trig:'Late night',mins:3,g:'Breathing reset',note:''});
   save();boot();
 }
 
@@ -1087,7 +1204,7 @@ document.addEventListener('keydown',e=>{const b=e.target.closest('[role=button][
   const sel=`[data-a="${b.dataset.a}"][data-v="${CSS.escape(b.dataset.v||'')}"]`,i=[...document.querySelectorAll(sel)].indexOf(b);b.click();document.querySelectorAll(sel)[i]?.focus()});
 document.addEventListener('click',e=>{const a=e.target.closest('a[data-app]');if(a&&embedded){e.preventDefault();openApp(a.dataset.app)}});
 // another app (or tab) logged something: refresh the linked ticks
-addEventListener('storage',e=>{if(e.key===KEY){S=load();render()}else if(Object.values(APPS).some(a=>a.key===e.key))render()});
+addEventListener('storage',e=>{if(e.key===KEY){S=load();render();planReg()}else if(Object.values(APPS).some(a=>a.key===e.key)){render();planReg()}});
 document.addEventListener('submit',e=>{if(e.target.id!=='ob')return;e.preventDefault();habitsForm(e.target.elements.n.value.trim())});
 document.addEventListener('change',e=>{const k=e.target.dataset.f;if(!k)return;U[k]=e.target.value;U.page=0;render()});
 $('#file').addEventListener('change',async e=>{
@@ -1113,12 +1230,33 @@ function linkAll(){
   });
   S.log=S.log.filter(e=>!moved.has(e.id));S.lv=2;save();
 }
-function boot(){linkAll();setMonth(S.log.length?Math.max(...S.log.map(t=>t.at)):Date.now());render()}
+/* ---------- TODAY's plan card ----------
+   One row: the danger hour and the swap to have ready. From the hour before it to its end the row's Start opens the
+   swap itself (act 'swap': the Today card's button, so REWIRE's own form, or the app the habit is saved in); the rest
+   of the day it opens the plan (act 'plan': the Today card, scrolled to the row). Never an urge surf: you start one
+   when an urge comes. Built from this app's log and the apps your good habits tick off from; save() rebuilds it. */
+let PK='';
+function planReg(){const src=[KEY,...new Set(S.good.map(g=>APPS[LINKS[g.link]?.app]?.key).filter(Boolean))];if(src.join()!==PK){PK=src.join();UI.planner('rewire',src,planRows)}else UI.replan()}
+function planRows(){
+  if(!S.bad.length)return [];
+  const P=dangerPlan([...S.log,...linked()]),bn=badOf(P.b)?.name||'',g=P.sw?.g,cut=(s,n)=>s.length>n?s.slice(0,n-1)+'…':s,done=P.done?{done:true}:{};
+  if(!g)return [{title:'Pick a swap',sub:cut(`Choose a good habit to replace ${bn}`,64),act:'swap'}];
+  if(P.h==null)return [{title:cut('Swap ready: '+g,28),sub:cut(`For ${bn} · log urges to find your danger hour`,64),act:'plan',...done}];
+  const title=`Danger hour ${hr(P.h)}`;
+  return [{title,sub:cut(`Now: ${g} instead of ${bn}`,64),act:'swap',h0:(P.h+23)%24,h1:(P.h+1)%24,...done},{title,sub:cut(`Ready: ${g} instead of ${bn}`,64),act:'plan',...done}];
+}
+function showPlan(){
+  const p=$('#plan');if(!p)return;
+  p.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
+  p.classList.remove('hi');void p.offsetWidth;p.classList.add('hi');p.querySelector('button')?.focus({preventScroll:true});
+}
+function boot(){linkAll();setMonth(S.log.length?Math.max(...S.log.map(t=>t.at)):Date.now());render();planReg()}
 boot();
 if(R)draw();
 // another ISIONXXX app can send you straight to an action here (REWIRE's LOG buttons): #do=<action> or a message
-// 'today' (from TODAY's rings and timeline): drop any card filters and show just today, as a chip you can clear
-function doAct(a){if(!/^\w+$/.test(a||''))return;if(a==='today'){U.x={};U.range=ymd(new Date());setMonth(Date.now());U.page=0;render();return}const b=document.querySelector(`[data-a="${a}"],[data-act="${a}"]`);if(b)b.click()}
+// 'today' (from TODAY's rings and timeline): drop any card filters and show just today, as a chip you can clear.
+// 'plan' (TODAY's plan card): show the danger-hour plan. An urge in progress comes first: it shows again instead.
+function doAct(a){if(!/^\w+$/.test(a||''))return;if(R&&a!=='today')return draw();if(a==='plan')return showPlan();if(a==='today'){U.x={};U.range=ymd(new Date());setMonth(Date.now());U.page=0;render();return}const b=document.querySelector(`[data-a="${a}"],[data-act="${a}"]`);if(b)b.click()}
 addEventListener('message',e=>{if(e.origin===location.origin&&e.data&&e.data.isx==='do')doAct(e.data.act)});
 {const m=/do=(\w+)/.exec(location.hash);if(m){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>doAct(m[1]),0)}}
 /* ---------- today at a glance (shared hero, timeline and motion from ui.js) ---------- */
