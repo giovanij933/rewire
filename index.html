@@ -473,7 +473,8 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 /* ---------- state ----------
    bad:  habits to break  {id,name,why,cost,unit:'$'|'min',goal(days),start(ms),reps:[good habit names]}
    good: habits to build  {name,target(per day)}
-   log:  {id,at,t:'resist'|'slip'|'done',b(bad id),g(good name),int(1-10),trig,note} — a resisted urge may carry the swap it led to */
+   log:  {id,at,t:'resist'|'slip'|'done',b(bad id),g(good name),int(1-10),trig,note} — a resisted urge may carry the swap it led to
+         (sg: the app's suggestion, left as it was; lk: a swap that counts from its own app) and the surf length (mins) */
 let S=load();
 const U={h:'all',range:'all',page:0,month:null,x:{}};   // x: cross-filters set by clicking a card (ev, dres, g, trig, band, hour)
 function load(){
@@ -561,13 +562,14 @@ function bestMins(b){
   return pick(E.filter(e=>e.b===b))||pick(E);
 }
 // the swap for an urge: the good habit you most often did within 3 h of beating this trigger (the swap logged with
-// the urge counts too), at least twice; else this habit's swap you did least recently (as of 'before': the day's plan
-// picks it as of this morning, so doing it doesn't move the plan on). L = the log plus linked ticks.
+// the urge counts too, unless it was the suggestion left as it was: sg), at least twice; else this habit's swap you did
+// least recently. All as of 'before': the day's plan picks it as of this morning, so doing it, or another swap, doesn't
+// move the plan on. L = the log plus linked ticks.
 function swapFor(b,trig,L,before=Infinity){
   const names=new Set(S.good.map(g=>g.name)),t=Date.now()-90*DAY;
   if(trig){
-    const R=L.filter(e=>e.t==='resist'&&e.b===b&&e.trig===trig&&e.at>t),D=L.filter(e=>e.t==='done'&&e.at>t),c={};
-    R.forEach(r=>{const s=new Set(r.g?[r.g]:[]);D.forEach(e=>{if(e.at>r.at&&e.at<=r.at+3*36e5)s.add(e.g)});s.forEach(g=>{if(names.has(g))c[g]=(c[g]||0)+1})});
+    const R=L.filter(e=>e.t==='resist'&&e.b===b&&e.trig===trig&&e.at>t&&e.at<before),D=L.filter(e=>e.t==='done'&&e.at>t&&e.at<before),c={};
+    R.forEach(r=>{const s=new Set(r.g&&!r.sg?[r.g]:[]);D.forEach(e=>{if(e.at>r.at&&e.at<=r.at+3*36e5)s.add(e.g)});s.forEach(g=>{if(names.has(g))c[g]=(c[g]||0)+1})});
     const m=topOf(c);if(m&&m.n>=2)return {g:m.v,n:m.n,of:R.length,trig};
   }
   const reps=(badOf(b)?.reps||[]).filter(r=>names.has(r));if(!reps.length)return null;
@@ -579,17 +581,21 @@ function swapFor(b,trig,L,before=Infinity){
 const swapWhy=(sw,short)=>sw.n?short?`after ${sw.n} of ${sw.of} beaten ${esc(sw.trig)} urges`:`you did it after ${sw.n} of the ${sw.of} ${esc(sw.trig)} urges you beat`
   :`${sw.k>1?short?'least recently done':'the swap you did least recently':'your swap'} · ${sw.last?'last done '+daysAgo(sw.last):'not done yet'}`;
 // the danger hour: the hour of the last 30 days with the most urges, a slip counting double. It needs 5 urges in all
-// and a score of 3 in that hour (a tie goes to the hour with the latest urge). Then the habit that hour is mostly
-// about, its usual trigger then and the swap to have ready (did: done today). done: today, from the hour before to the
-// hour after, no slip and either the swap done or an urge beaten (with no danger hour yet: the swap done today).
+// and a score of 3 in that hour, and a tie for first is no pattern. Then the habit that hour is mostly about, its usual
+// trigger then and the swap to have ready (did: done today, as REWIRE counts it). done: no slip of that habit from the
+// hour before the danger hour to its end, and since the hour before, the swap done; or once the hour is over, one of
+// its urges beaten. A swap saved with an urge just as it was suggested (sg) counts like the urge. With no danger hour
+// yet: the swap done today. From 11 PM a 12 AM danger hour means tonight's, not last night's.
 function dangerPlan(L){
-  const E=urgesIn(30),sc=Array(24).fill(0),la=Array(24).fill(0),ho=e=>new Date(e.at).getHours();
-  E.forEach(e=>{const h=ho(e);sc[h]+=e.t==='slip'?2:1;la[h]=Math.max(la[h],e.at)});
-  const x=sc.reduce((a,v,i)=>v>sc[a]||v===sc[a]&&la[i]>la[a]?i:a,0),h=E.length>=5&&sc[x]>=3?x:null;
+  const E=urgesIn(30),sc=Array(24).fill(0),ho=e=>new Date(e.at).getHours();
+  E.forEach(e=>sc[ho(e)]+=e.t==='slip'?2:1);
+  const top=Math.max(...sc),x=sc.indexOf(top),h=E.length>=5&&top>=3&&sc.lastIndexOf(top)===x?x:null;
   const H=h==null?E:E.filter(e=>ho(e)===h),lt=H.reduce((a,e)=>!a||e.at>a.at?e:a,null);
   const d=new Date(),t0=new Date(d).setHours(0,0,0,0),b=most(H,e=>e.b)?.v||lt?.b||S.bad[0].id,trig=h==null?null:pfill(b,h).trig?.v||null,sw=swapFor(b,trig,L,t0);
-  const did=!!sw&&L.some(e=>e.at>=t0&&e.t!=='slip'&&e.g===sw.g),w0=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h-1).getTime(),W=L.filter(e=>e.at>=w0&&e.at<w0+3*36e5);
-  const done=h==null?did:!W.some(e=>e.t==='slip')&&W.some(e=>e.t==='resist'||!!sw&&e.t==='done'&&e.g===sw.g);
+  const sd=e=>!!sw&&isDone(e)&&e.g===sw.g,did=L.some(e=>e.at>=t0&&sd(e));
+  let done=did;
+  if(h!=null){const hs=new Date(d.getFullYear(),d.getMonth(),d.getDate()+(h||d.getHours()<23?0:1),h).getTime(),W=L.filter(e=>e.at>=hs-36e5&&e.at<hs+36e5);
+    done=!W.some(e=>e.t==='slip'&&e.b===b)&&W.some(e=>sd(e)&&!e.sg||d>=hs+36e5&&(sd(e)||e.t==='resist'&&e.b===b))}
   return {h,n:H.length,s:H.filter(e=>e.t==='slip').length,N:E.length,b,trig,sw,did,done};
 }
 
@@ -690,7 +696,7 @@ const doneBtn=(g,x='')=>{const lk=LINKS[g.link];return `<button data-a="done" da
 function planRow(){
   const P=dangerPlan([...S.log,...LK]),g=P.sw&&S.good.find(x=>x.name===P.sw.g),bn=esc(badOf(P.b)?.name||''),pl=(n,w)=>`${n} ${w}${n===1?'':'s'}`,c=new Date().getHours();
   const head=P.h==null?'No danger hour yet':c===P.h?`It's your danger hour: ${hr(P.h)}`:c===(P.h+23)%24?`Danger hour ahead: ${hr(P.h)}`:`${hr(P.h)} is your danger hour`;
-  const what=P.h!=null?`${pl(P.n,'urge')}${P.s?`, ${pl(P.s,'slip')}`:''} in that hour · last 30 days`
+  const what=P.h!=null?`${pl(P.n,'urge')}${P.s?`, ${pl(P.s,'slip')}`:''} in that hour · last 30 days${P.s?', slips count double':''}`
     :P.N>=5?`${pl(P.N,'urge')} in the last 30 days, spread out: no hour stands out yet`
     :`${P.N?`Only ${pl(P.N,'urge')} in the last 30 days. `:''}Log urges as they come and the hour they cluster at shows here`;
   return `<div class="trow" id="plan"><div><b>${head}</b><div class="dim">${what}${P.done&&P.h!=null?' · <span class="pos">done today ✓</span>':''}</div>
@@ -764,14 +770,14 @@ function render(){
  <div class="card"><p class="h">Saved</p><div class="k">By urges beaten</div><div class="big pos">${sv}</div>
   ${ev('Urges beaten',s.r,s.r,'ev:resist')}${ev('Avg urge strength',s.int==null?'—':s.int.toFixed(1)+' / 10',0,'',`Average of ${s.urges} urge${s.urges===1?'':'s'}, 1–10`)}
   ${ev('Urge strength trend',trend==null?'—':(trend<=0?'▼ ':'▲ ')+Math.abs(trend).toFixed(1),trend==null?0:-trend,'','Later half of urges vs earlier half · lower is better')}
-  <div class="ev rule${danger==null?'':' pick'+(U.x.hour===danger?' on':'')}"${danger==null?'':xa('hour:'+danger)}><span class="dim">Danger hour</span><b class="amb">${hr(danger)}</b></div></div>
+  <div class="ev rule${danger==null?'':' pick'+(U.x.hour===danger?' on':'')}"${danger==null?'':xa('hour:'+danger)}><span class="dim">Busiest hour</span><b class="amb">${hr(danger)}</b></div></div>
 </section>
 <section class="g g21">${calendar()}${today()}</section>
 <section class="g g21">
  <div class="card"><div class="rowh"><div><p class="h">Urges per day</p><div class="big">${s.urges}</div></div>
   <div class="eqs">${kv('Beaten',`<span class="pos">${s.r}</span>`)}${kv('Slipped',`<span class="neg">${s.s}</span>`)}${kv('Good habits',s.done)}${kv('Days',dk.length)}</div></div>
   ${stack(dk.map(k=>[[s.D[k].r,'fp'],[s.D[k].s,'fn']]),dayAt(dk,dk,(_,k)=>tday(k)))}</div>
- <div class="card"><p class="h">Danger hours</p><div class="k">Urges by hour of day</div><div class="big amb">${hr(danger)}</div>${stack0(sh.hours.map(v=>[[v,'fa']]),hrAt)}<div class="hl"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11 PM</span></div></div>
+ <div class="card"><p class="h">Urges by hour</p><div class="k">Busiest hour of day</div><div class="big amb">${hr(danger)}</div>${stack0(sh.hours.map(v=>[[v,'fa']]),hrAt)}<div class="hl"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11 PM</span></div></div>
 </section>
 <section class="g g3">
  <div class="card"><p class="h">Wins</p><div class="k">Urges beaten + good habits, cumulative</div><div class="big pos">${s.r+s.done}</div>
@@ -925,13 +931,15 @@ function urgeForm(bid){
     if(m){own.mins=1;mins=+m.dataset.m;pick('[data-m]',y=>y===m);paint()}
   });
   f.addEventListener('input',paint);paint();
+  // tg: the trigger is still the guess, so the form after the surf asks you to confirm it
+  const tg=()=>!own.trig&&!!cval('trig');
   $('#us').onclick=()=>{
-    const now=Date.now();R={b,int:rval('int'),trig:cval('trig'),t0:now,end:now,slipped:true};keepRun();draw();
+    const now=Date.now();R={b,int:rval('int'),trig:cval('trig'),tg:tg(),t0:now,end:now,slipped:true};keepRun();draw();
   };
   f.onsubmit=ev=>{
     ev.preventDefault();
     try{localStorage.setItem(RUN+'.pref',JSON.stringify({mins}))}catch(e){}
-    R={b,int:rval('int'),trig:cval('trig'),mins,t0:Date.now(),end:null,rep:sw?.g||badOf(b).reps[0]||null,sug:sw?.g||null};
+    R={b,int:rval('int'),trig:cval('trig'),tg:tg(),mins,t0:Date.now(),end:null,rep:sw?.g||badOf(b).reps[0]||null,sug:sw?.g||null};
     bell(1);keepRun();draw();
   };
   sheet();dlg.showModal();
@@ -957,7 +965,7 @@ function surfView(){
   };
   const anim=()=>{const b=$('#ball');if(!R||R.end||!b)return;b.style.transform=`scale(${breath(elapsed()).s.toFixed(3)})`;RA=requestAnimationFrame(anim)};
   RA=requestAnimationFrame(anim);
-  dlg.querySelectorAll('[data-sr]').forEach(x=>x.onclick=()=>{R.rep=x.dataset.sr;keepRun();dlg.querySelectorAll('[data-sr]').forEach(y=>y.classList.toggle('on',y===x));tick()});
+  dlg.querySelectorAll('[data-sr]').forEach(x=>x.onclick=()=>{R.rep=x.dataset.sr;R.ro=1;keepRun();dlg.querySelectorAll('[data-sr]').forEach(y=>y.classList.toggle('on',y===x));tick()});
   const finish=slip=>{clearInterval(RI);cancelAnimationFrame(RA);R.end=Date.now();R.slipped=slip;keepRun();wake(false);draw()};
   $('#sd').onclick=()=>finish(false);$('#sl').onclick=()=>finish(true);
   RI=setInterval(tick,250);tick();wake(true);
@@ -969,7 +977,7 @@ function outcomeForm(){
    :`<p class="pos">You rode it out${R.end>R.t0?` in ${fm((R.end-R.t0)/60000)}`:''}. Each time, the loop gets weaker.</p>
      ${reps.length?`<span class="k">Swap you did</span>${cpick('rep',reps,R.rep,swapEm)}`:''}`}
    ${R.int==null?rpick('int','How strong was it? (1–10)'):''}
-   ${R.trig?'':`<span class="k">What set it off?</span>${cpick('trig',TRIG)}`}
+   ${R.trig&&!R.tg?'':`<span class="k">What set it off?</span>${cpick('trig',TRIG,R.trig,x=>R.tg&&x===R.trig?'pre-filled':'')}`}
    <label>Note<textarea name="note" rows="3" placeholder="${R.slipped?'Where, when, what would help next time.':'What helped.'}"></textarea></label>
    <div class="fa2"><button type="button" class="ghost" id="ox">DISCARD</button>${R.slipped?'':'<button type="button" id="os">ACTUALLY SLIPPED</button><button type="button" id="oo" hidden>SAVE &amp; OPEN</button>'}<button class="pri">SAVE</button></div></form>`;
   const f=$('#of');
@@ -979,12 +987,15 @@ function outcomeForm(){
   const lkOf=n=>LINKS[S.good.find(g=>g.name===n)?.link];
   const oo=$('#oo'),syncO=()=>{if(!oo)return;const l=lkOf(cval('rep'));oo.hidden=!l;if(l)oo.textContent=`SAVE & OPEN ${l.app}`};
   f.addEventListener('input',syncO);syncO();
+  // a swap you pick, here or in the surf, is yours; the suggestion left as it was is saved as such (sg), so the next
+  // suggestion doesn't count it as your pattern
+  let own=0;f.addEventListener('click',ev=>{if(ev.target.closest('[data-c=rep] [data-cv]'))own=1});
   oo&&(oo.onclick=()=>{const l=lkOf(cval('rep'));f.requestSubmit();if(l)openApp(l.app)});
   f.onsubmit=ev=>{
     ev.preventDefault();
     // mins: how long the surf was set for (not kept when you'd already slipped), for the next urge's surf length
-    const e={id:uid(),at:R.t0,t:R.slipped?'slip':'resist',b:R.b,int:R.int??rval('int'),trig:R.trig??cval('trig'),...(R.mins?{mins:R.mins}:{}),note:f.elements.note.value.trim()};
-    if(!R.slipped){const g=cval('rep');if(g)e.g=g;if(g&&LINKS[S.good.find(x=>x.name===g)?.link])e.lk=1}
+    const e={id:uid(),at:R.t0,t:R.slipped?'slip':'resist',b:R.b,int:R.int??rval('int'),trig:R.trig&&!R.tg?R.trig:cval('trig'),...(R.mins?{mins:R.mins}:{}),note:f.elements.note.value.trim()};
+    if(!R.slipped){const g=cval('rep');if(g)e.g=g;if(g&&g===R.sug&&!R.ro&&!own)e.sg=1;if(g&&LINKS[S.good.find(x=>x.name===g)?.link])e.lk=1}
     S.log.push(e);save();clearRun();dlg.close();setMonth(e.at);render();
     toast(e.t==='slip'?'Logged. Next urge, fresh start.':`Urge beaten${h?.cost?` · ${money(+h.cost,h.unit)} saved`:''}`);
   };
@@ -1016,7 +1027,7 @@ function entryForm(t){
     if(ty==='done'&&lg&&!(t&&t.g===e.g.value)){$('#pv').innerHTML=`<b class="amb">Log ${esc(e.g.value)} in ${lg.app}: it ticks off here by itself</b>`;return}
     if(ty!=='slip'&&e.g.value)v.g=e.g.value;
     if(ty==='done'&&!v.g){$('#pv').innerHTML='<b class="neg">Pick the good habit</b>';return}
-    if(t){const o=S.log.find(x=>x.id===t.id);['b','g','int','trig'].forEach(k=>delete o[k]);Object.assign(o,v)}else S.log.push({id:uid(),...v});
+    if(t){const o=S.log.find(x=>x.id===t.id);if(o.g!==v.g)delete o.sg;['b','g','int','trig'].forEach(k=>delete o[k]);Object.assign(o,v)}else S.log.push({id:uid(),...v});
     save();dlg.close();setMonth(v.at);render();
   };
   dlg.showModal();
@@ -1124,7 +1135,7 @@ function review(day){
   else if(top&&swAll>=5)good.push(`${esc(top[0])} has now helped me beat ${swAll} urges.`);
   L.forEach(e=>look.push(`Slipped at ${hm(e.at)} (${nm(e)}${e.trig?`, after ${esc(e.trig)}`:''}${e.int!=null?`, strength ${e.int}/10`:''})${e.note?` — <q>${esc(e.note)}</q>`:''}. What came just before it?`));
   if(tt&&tt[1]>=2)look.push(`${esc(tt[0])} set off ${tt[1]} of the ${pl(Ug.length,'urge')}.`);
-  if(inDh)look.push(`${inDh===1?'One urge':inDh+' urges'} came in the ${hr(dh)} hour, my danger hour.`);
+  if(inDh)look.push(`${inDh===1?'One urge':inDh+' urges'} came in the ${hr(dh)} hour, when most of my urges come.`);
   if(miss.length)look.push(`${isT?'Not done yet':'Missed'}: ${miss.map(x=>`${esc(x.g.name)} (${x.n} of ${x.tg})`).join(', ')}.`);
   if(stronger)look.push(`Urges were stronger than usual (${f1(di)} vs ${f1(ui)}).`);
   out+=sec('What went well',good.length?li(good):'<p>Nothing stands out in the numbers. Some days are about getting through, and that counts.</p>');
@@ -1137,7 +1148,7 @@ function review(day){
        :!sh&&ci.sleep!=null&&!L.length&&Ug.length?' Rested, and no slips.':'')+`</p>`)}
   out+=sec('My notes',S.notes[day]?`<blockquote>${esc(S.notes[day])}</blockquote>`:'<p>No notes for this day yet.</p>');
   // questions, most specific first
-  // ask about the danger hour when the trigger hit then today, else about the hour it did hit
+  // ask about the busiest hour when the trigger hit then today, else about the hour it did hit
   const q=[],trq=(tt||Object.entries(tr)[0]||[])[0],hrs=[...L,...R].filter(e=>e.trig===trq).map(e=>new Date(e.at).getHours()),qh=hrs.includes(dh)?dh:hrs[0];
   if(L.length)q.push(`What happened in the ten minutes before the ${hm(L[0].at)} slip? Where could I have stepped in?`);
   if(trq)q.push(`What will I do instead next time ${esc(trq)} hits around ${hr(qh)}?`);
@@ -1255,8 +1266,9 @@ boot();
 if(R)draw();
 // another ISIONXXX app can send you straight to an action here (REWIRE's LOG buttons): #do=<action> or a message
 // 'today' (from TODAY's rings and timeline): drop any card filters and show just today, as a chip you can clear.
-// 'plan' (TODAY's plan card): show the danger-hour plan. An urge in progress comes first: it shows again instead.
-function doAct(a){if(!/^\w+$/.test(a||''))return;if(R&&a!=='today')return draw();if(a==='plan')return showPlan();if(a==='today'){U.x={};U.range=ymd(new Date());setMonth(Date.now());U.page=0;render();return}const b=document.querySelector(`[data-a="${a}"],[data-act="${a}"]`);if(b)b.click()}
+// 'plan' (TODAY's plan card): show the danger-hour plan. An urge in progress comes first: it shows again instead
+// (left as it is when it's already open, so what you've typed stays).
+function doAct(a){if(!/^\w+$/.test(a||''))return;if(R&&a!=='today'){if(!dlg.open)draw();return}if(a==='plan')return showPlan();if(a==='today'){U.x={};U.range=ymd(new Date());setMonth(Date.now());U.page=0;render();return}const b=document.querySelector(`[data-a="${a}"],[data-act="${a}"]`);if(b)b.click()}
 addEventListener('message',e=>{if(e.origin===location.origin&&e.data&&e.data.isx==='do')doAct(e.data.act)});
 {const m=/do=(\w+)/.exec(location.hash);if(m){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>doAct(m[1]),0)}}
 /* ---------- today at a glance (shared hero, timeline and motion from ui.js) ---------- */
