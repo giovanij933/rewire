@@ -563,8 +563,8 @@ function bestMins(b){
 }
 // the swap for an urge: the good habit you most often did within 3 h of beating this trigger (the swap logged with
 // the urge counts too, unless it was the suggestion left as it was: sg), at least twice; else this habit's swap you did
-// least recently. All as of 'before': the day's plan picks it as of this morning, so doing it, or another swap, doesn't
-// move the plan on. L = the log plus linked ticks.
+// least recently. All as of 'before': the day's plan picks it as of this morning (a 12 AM danger hour: as of the 11 PM
+// its night starts at), so doing it, or another swap, doesn't move the plan on. L = the log plus linked ticks.
 function swapFor(b,trig,L,before=Infinity){
   const names=new Set(S.good.map(g=>g.name)),t=Date.now()-90*DAY;
   if(trig){
@@ -585,16 +585,19 @@ const swapWhy=(sw,short)=>sw.n?short?`after ${sw.n} of ${sw.of} beaten ${esc(sw.
 // trigger then and the swap to have ready (did: done today, as REWIRE counts it). done: no slip of that habit from the
 // hour before the danger hour to its end, and since the hour before, the swap done; or once the hour is over, one of
 // its urges beaten. A swap saved with an urge just as it was suggested (sg) counts like the urge. With no danger hour
-// yet: the swap done today. From 11 PM a 12 AM danger hour means tonight's, not last night's.
-function dangerPlan(L){
+// yet: the swap done today. A 12 AM danger hour is a night's, from 11 PM to 1 AM: in its 12 AM hour the night you're
+// in, else (nx: always) the night that starts at the coming 11 PM. Its swap and did are as of that 11 PM, so they stay
+// the same across midnight, and all day before it the plan names tonight's swap from what's logged so far.
+function dangerPlan(L,nx){
   const E=urgesIn(30),sc=Array(24).fill(0),ho=e=>new Date(e.at).getHours();
   E.forEach(e=>sc[ho(e)]+=e.t==='slip'?2:1);
   const top=Math.max(...sc),x=sc.indexOf(top),h=E.length>=5&&top>=3&&sc.lastIndexOf(top)===x?x:null;
   const H=h==null?E:E.filter(e=>ho(e)===h),lt=H.reduce((a,e)=>!a||e.at>a.at?e:a,null);
-  const d=new Date(),t0=new Date(d).setHours(0,0,0,0),b=most(H,e=>e.b)?.v||lt?.b||S.bad[0].id,trig=h==null?null:pfill(b,h).trig?.v||null,sw=swapFor(b,trig,L,t0);
-  const sd=e=>!!sw&&isDone(e)&&e.g===sw.g,did=L.some(e=>e.at>=t0&&sd(e));
+  const d=new Date(),t0=new Date(d).setHours(0,0,0,0),hs=h==null?0:new Date(d.getFullYear(),d.getMonth(),d.getDate()+(h||!nx&&!d.getHours()?0:1),h).getTime(),as=h===0?hs-36e5:t0;
+  const b=most(H,e=>e.b)?.v||lt?.b||S.bad[0].id,trig=h==null?null:pfill(b,h).trig?.v||null,sw=swapFor(b,trig,L,as);
+  const sd=e=>!!sw&&isDone(e)&&e.g===sw.g,did=L.some(e=>e.at>=as&&sd(e));
   let done=did;
-  if(h!=null){const hs=new Date(d.getFullYear(),d.getMonth(),d.getDate()+(h||d.getHours()<23?0:1),h).getTime(),W=L.filter(e=>e.at>=hs-36e5&&e.at<hs+36e5);
+  if(h!=null){const W=L.filter(e=>e.at>=hs-36e5&&e.at<hs+36e5);
     done=!W.some(e=>e.t==='slip'&&e.b===b)&&W.some(e=>sd(e)&&!e.sg||d>=hs+36e5&&(sd(e)||e.t==='resist'&&e.b===b))}
   return {h,n:H.length,s:H.filter(e=>e.t==='slip').length,N:E.length,b,trig,sw,did,done};
 }
@@ -694,13 +697,13 @@ const doneBtn=(g,x='')=>{const lk=LINKS[g.link];return `<button data-a="done" da
 // the danger-hour plan: the hour your urges cluster at and the swap to have ready. TODAY's plan opens on it: act
 // 'plan' shows this row, act 'swap' presses its button.
 function planRow(){
-  const P=dangerPlan([...S.log,...LK]),g=P.sw&&S.good.find(x=>x.name===P.sw.g),bn=esc(badOf(P.b)?.name||''),pl=(n,w)=>`${n} ${w}${n===1?'':'s'}`,c=new Date().getHours();
+  const P=dangerPlan([...S.log,...LK]),g=P.sw&&S.good.find(x=>x.name===P.sw.g),bn=esc(badOf(P.b)?.name||''),pl=(n,w)=>`${n} ${w}${n===1?'':'s'}`,c=new Date().getHours(),dd=P.h===0?'tonight':'today';
   const head=P.h==null?'No danger hour yet':c===P.h?`It's your danger hour: ${hr(P.h)}`:c===(P.h+23)%24?`Danger hour ahead: ${hr(P.h)}`:`${hr(P.h)} is your danger hour`;
   const what=P.h!=null?`${pl(P.n,'urge')}${P.s?`, ${pl(P.s,'slip')}`:''} in that hour · last 30 days${P.s?', slips count double':''}`
     :P.N>=5?`${pl(P.N,'urge')} in the last 30 days, spread out: no hour stands out yet`
     :`${P.N?`Only ${pl(P.N,'urge')} in the last 30 days. `:''}Log urges as they come and the hour they cluster at shows here`;
-  return `<div class="trow" id="plan"><div><b>${head}</b><div class="dim">${what}${P.done&&P.h!=null?' · <span class="pos">done today ✓</span>':''}</div>
-    <div class="dim">${!g?`Pick a good habit to swap in for ${bn}`:P.did?`<span class="pos">✓</span> <span class="amb">${esc(g.name)}</span> done today`
+  return `<div class="trow" id="plan"><div><b>${head}</b><div class="dim">${what}${P.done&&P.h!=null?` · <span class="pos">done ${dd} ✓</span>`:''}</div>
+    <div class="dim">${!g?`Pick a good habit to swap in for ${bn}`:P.did?`<span class="pos">✓</span> <span class="amb">${esc(g.name)}</span> done ${dd}`
       :`Have <span class="amb">${esc(g.name)}</span> ready${S.bad.length>1?` for ${bn}`:''} · ${swapWhy(P.sw,1)}`}</div></div>
     <span class="tb">${g?doneBtn(g,' data-act="swap"'):'<button data-a="habits" data-act="swap">PICK ONE</button>'}</span></div>`;
 }
@@ -1250,11 +1253,15 @@ let PK='';
 function planReg(){const src=[KEY,...new Set(S.good.map(g=>APPS[LINKS[g.link]?.app]?.key).filter(Boolean))];if(src.join()!==PK){PK=src.join();UI.planner('rewire',src,planRows)}else UI.replan()}
 function planRows(){
   if(!S.bad.length)return [];
-  const P=dangerPlan([...S.log,...linked()]),bn=badOf(P.b)?.name||'',g=P.sw?.g,cut=(s,n)=>s.length>n?s.slice(0,n-1)+'…':s,done=P.done?{done:true}:{};
-  if(!g)return [{title:'Pick a swap',sub:cut(`Choose a good habit to replace ${bn}`,64),act:'swap'}];
-  if(P.h==null)return [{title:cut('Swap ready: '+g,28),sub:cut(`For ${bn} · log urges to find your danger hour`,64),act:'plan',...done}];
-  const title=`Danger hour ${hr(P.h)}`;
-  return [{title,sub:cut(`Now: ${g} instead of ${bn}`,64),act:'swap',h0:(P.h+23)%24,h1:(P.h+1)%24,...done},{title,sub:cut(`Ready: ${g} instead of ${bn}`,64),act:'plan',...done}];
+  const L=[...S.log,...linked()],P=dangerPlan(L),bn=badOf(P.b)?.name||'',cut=(s,n)=>s.length>n?s.slice(0,n-1)+'…':s;
+  // 12 AM: the plan is saved again only when the data or the date changes, so each row holds the night it's shown in:
+  // the 12 AM hour the night you're in (P), the day and the 11 PM hour the night that starts at this day's 11 PM (Q)
+  const Q=P.h===0&&!new Date().getHours()?dangerPlan(L,1):P,title=`Danger hour ${hr(P.h)}`;
+  const row=(X,k,act,w)=>X.sw?{title,sub:cut(`${k}: ${X.sw.g} instead of ${bn}`,64),act,...w,...(X.done?{done:true}:{})}:{title:'Pick a swap',sub:cut(`Choose a good habit to replace ${bn}`,64),act:'swap',...w};
+  if(!P.sw&&!Q.sw)return [row(P)];
+  if(P.h==null)return [{title:cut('Swap ready: '+P.sw.g,28),sub:cut(`For ${bn} · log urges to find your danger hour`,64),act:'plan',...(P.done?{done:true}:{})}];
+  if(P.h)return [row(P,'Now','swap',{h0:P.h-1,h1:(P.h+1)%24}),row(P,'Ready','plan')];
+  return [row(Q,'Now','swap',{h0:23,h1:0}),row(P,'Now','swap',{h0:0,h1:1}),row(Q,'Ready','plan')];
 }
 function showPlan(){
   const p=$('#plan');if(!p)return;
