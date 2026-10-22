@@ -563,8 +563,8 @@ function bestMins(b){
 }
 // the swap for an urge: the good habit you most often did within 3 h of beating this trigger (the swap logged with
 // the urge counts too, unless it was the suggestion left as it was: sg), at least twice; else this habit's swap you did
-// least recently. All as of 'before': the day's plan picks it as of this morning, so doing it, or another swap, doesn't
-// move the plan on. L = the log plus linked ticks.
+// least recently. All as of 'before': the day's plan picks it as of this morning (a 12 AM danger hour: as of 11 PM
+// the evening before), so doing it, or another swap, doesn't move the plan on. L = the log plus linked ticks.
 function swapFor(b,trig,L,before=Infinity){
   const names=new Set(S.good.map(g=>g.name)),t=Date.now()-90*DAY;
   if(trig){
@@ -585,16 +585,18 @@ const swapWhy=(sw,short)=>sw.n?short?`after ${sw.n} of ${sw.of} beaten ${esc(sw.
 // trigger then and the swap to have ready (did: done today, as REWIRE counts it). done: no slip of that habit from the
 // hour before the danger hour to its end, and since the hour before, the swap done; or once the hour is over, one of
 // its urges beaten. A swap saved with an urge just as it was suggested (sg) counts like the urge. With no danger hour
-// yet: the swap done today. From 11 PM a 12 AM danger hour means tonight's, not last night's.
+// yet: the swap done today. From 11 PM a 12 AM danger hour means tonight's, not last night's, and its plan (the swap
+// and did) runs from that 11 PM until the next one, so it stays the same across midnight.
 function dangerPlan(L){
   const E=urgesIn(30),sc=Array(24).fill(0),ho=e=>new Date(e.at).getHours();
   E.forEach(e=>sc[ho(e)]+=e.t==='slip'?2:1);
   const top=Math.max(...sc),x=sc.indexOf(top),h=E.length>=5&&top>=3&&sc.lastIndexOf(top)===x?x:null;
   const H=h==null?E:E.filter(e=>ho(e)===h),lt=H.reduce((a,e)=>!a||e.at>a.at?e:a,null);
-  const d=new Date(),t0=new Date(d).setHours(0,0,0,0),b=most(H,e=>e.b)?.v||lt?.b||S.bad[0].id,trig=h==null?null:pfill(b,h).trig?.v||null,sw=swapFor(b,trig,L,t0);
-  const sd=e=>!!sw&&isDone(e)&&e.g===sw.g,did=L.some(e=>e.at>=t0&&sd(e));
+  const d=new Date(),t0=new Date(d).setHours(0,0,0,0),hs=h==null?0:new Date(d.getFullYear(),d.getMonth(),d.getDate()+(h||d.getHours()<23?0:1),h).getTime(),as=h===0?hs-36e5:t0;
+  const b=most(H,e=>e.b)?.v||lt?.b||S.bad[0].id,trig=h==null?null:pfill(b,h).trig?.v||null,sw=swapFor(b,trig,L,as);
+  const sd=e=>!!sw&&isDone(e)&&e.g===sw.g,did=L.some(e=>e.at>=as&&sd(e));
   let done=did;
-  if(h!=null){const hs=new Date(d.getFullYear(),d.getMonth(),d.getDate()+(h||d.getHours()<23?0:1),h).getTime(),W=L.filter(e=>e.at>=hs-36e5&&e.at<hs+36e5);
+  if(h!=null){const W=L.filter(e=>e.at>=hs-36e5&&e.at<hs+36e5);
     done=!W.some(e=>e.t==='slip'&&e.b===b)&&W.some(e=>sd(e)&&!e.sg||d>=hs+36e5&&(sd(e)||e.t==='resist'&&e.b===b))}
   return {h,n:H.length,s:H.filter(e=>e.t==='slip').length,N:E.length,b,trig,sw,did,done};
 }
