@@ -9,8 +9,9 @@
 <meta name="apple-mobile-web-app-title" content="REWIRE">
 <title>ISIONXXX // REWIRE</title>
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -276,7 +277,7 @@ dialog.rvd{width:min(680px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
   </div>
 </header>
 <div id="top"></div>
-<div class="bar">
+<div class="bar" role="region" aria-label="Filters">
   <select data-f="h" aria-label="Habit"></select>
   <select data-f="range" aria-label="Range"></select>
   <span id="scope" class="dim"></span>
@@ -376,7 +377,7 @@ function logTo(g,d,at=Date.now(),id=uid()){
   }
   UI.replan();   // the plan reads these apps too
 }
-const arr=x=>Array.isArray(x)?x:[];
+const arr=x=>Array.isArray(x)?x:[],fin=v=>typeof v==='number'&&isFinite(v);
 const detail=a=>a.filter(Boolean).map(String).join(' · ');
 // what a done entry adds up to, for the log and today's list
 const doneDet=e=>e.det!=null?e.det:detail([e.amt!=null?`${e.amt} ${e.unit||''}`.trim():'',e.feel?`felt ${e.feel}/10`:'',e.b&&badOf(e.b)?`instead of ${badOf(e.b).name}`:'']);
@@ -478,8 +479,15 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 let S=load();
 const U={h:'all',range:'all',page:0,month:null,x:{}};   // x: cross-filters set by clicking a card (ev, dres, g, trig, band, hour)
 function load(){
-  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.log))return {bad:s.bad||[],good:s.good||[],log:s.log,notes:s.notes||{},lv:s.lv||0}}catch(e){}
+  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.log))return clean(s)}catch(e){}
   return {bad:[],good:[],log:[],notes:{}};
+}
+// saved or restored data, checked so one bad value can't stop the app from starting: habits need an id and a name,
+// entries a time and a kind. lv stays, or a restore would move its good-habit ticks into the other apps again.
+function clean(s){
+  return {bad:arr(s.bad).filter(b=>b?.id&&typeof b.name==='string').map(b=>({...b,start:fin(b.start)?b.start:Date.now(),reps:arr(b.reps)})),
+    good:arr(s.good).filter(g=>typeof g?.name==='string'),log:s.log.filter(e=>fin(e?.at)&&['resist','slip','done'].includes(e.t)),
+    notes:s.notes&&typeof s.notes==='object'&&!Array.isArray(s.notes)?s.notes:{},lv:s.lv||0};
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Storage write failed — take a backup')}planReg()}
 function setMonth(ms){const d=new Date(ms);U.month={y:d.getFullYear(),m:d.getMonth()}}
@@ -509,16 +517,18 @@ function view(useRange=true,skip=''){
 }
 // clean streak = time since the last slip (or since you started); best = the longest gap between slips.
 // now = the moment to measure at (the daily review asks about the end of a past day).
+// Measured on the wall clock (wc), so a DST change doesn't add or take away an hour: clean since a date turns a whole
+// day at midnight. Never below 0 (a clean-since date still to come, or the hour DST repeats).
 function streak(ids,now=Date.now()){
-  let cur=Infinity,best=0,goal=0;
+  let cur=Infinity,best=0,goal=0;const wc=t=>t-new Date(t).getTimezoneOffset()*6e4;
   ids.forEach(id=>{
     const b=badOf(id);if(!b)return;goal=Math.max(goal,b.goal||30);
     const sl=S.log.filter(e=>e.t==='slip'&&e.b===id).map(e=>e.at).sort((a,c)=>a-c);
-    const pts=[b.start,...sl.filter(t=>t>=b.start&&t<=now),now];let bb=0;
+    const pts=[b.start,...sl.filter(t=>t>=b.start&&t<=now),now].map(wc);let bb=0;
     for(let i=1;i<pts.length;i++)bb=Math.max(bb,pts[i]-pts[i-1]);
-    cur=Math.min(cur,now-pts[pts.length-2]);best=Math.max(best,bb);
+    cur=Math.min(cur,pts[pts.length-1]-pts[pts.length-2]);best=Math.max(best,bb);
   });
-  return {cur:isFinite(cur)?cur:0,best,goal};
+  return {cur:isFinite(cur)?Math.max(0,cur):0,best,goal};
 }
 function stats(T){
   const U2=T.filter(e=>e.t!=='done'),R=U2.filter(e=>e.t==='resist'),L=U2.filter(e=>e.t==='slip'),I=U2.filter(e=>e.int!=null);
@@ -741,7 +751,9 @@ function render(){
   if(U.x.g&&!S.good.some(g=>g.name===U.x.g))delete U.x.g;
   LK=linked();
   const T=view(),s=stats(T),ids=U.h==='all'?S.bad.map(b=>b.id):[U.h],st=streak(ids),gf=st.goal?Math.min(1,st.cur/(st.goal*DAY)):0;
-  const t=ymd(new Date()),tgt=S.good.reduce((a,g)=>a+(g.target||1),0),dn=S.log.filter(e=>isDone(e)&&ymd(new Date(e.at))===t).length;
+  // today's good habits as the Today card and TODAY count them: linked ticks too, each habit up to its target
+  const t=ymd(new Date()),tgt=S.good.reduce((a,g)=>a+(g.target||1),0),TD=[...S.log,...LK].filter(e=>isDone(e)&&ymd(new Date(e.at))===t),
+    dn=S.good.reduce((a,g)=>a+Math.min(g.target||1,TD.filter(e=>e.g===g.name).length),0);
   $('[data-f=h]').innerHTML='<option value="all">All habits</option>'+S.bad.map(b=>`<option value="${b.id}"${b.id===U.h?' selected':''}>${esc(b.name)}</option>`).join('');
   $('[data-f=range]').innerHTML=Object.entries(RANGES).map(([k,v])=>`<option value="${k}"${k===U.range?' selected':''}>${v}</option>`).join('')+(U.range in RANGES?'':`<option value="${U.range}" selected>${dlabel(U.range)}</option>`);
   $('#scope').textContent=`Statistics for ${U.h==='all'?'All Habits':badOf(U.h).name} — ${RANGES[U.range]||dlabel(U.range)}`+(s.dk.length?` · ${dlabel(s.dk[0])} → ${dlabel(s.dk[s.dk.length-1])}`:'');
@@ -797,7 +809,7 @@ ${table(T)}
 
 /* ---------- habits setup ---------- */
 function habitsForm(pick){
-  const B=S.bad.map(b=>({...b,reps:[...b.reps]})),G=S.good.map(g=>({...g}));
+  const B=S.bad.map(b=>({...b,reps:[...b.reps]})),G=S.good.map(g=>({...g})),was=new Map(G.map(g=>[g,g.name]));   // was: names before this edit
   if(pick!=null)B.push({id:uid(),name:pick,why:'',cost:'',unit:'$',goal:30,start:Date.now(),reps:[]});
   if(!B.length)B.push({id:uid(),name:'',why:'',cost:'',unit:'$',goal:30,start:Date.now(),reps:[]});
   const draw=()=>{
@@ -831,7 +843,8 @@ function habitsForm(pick){
       f.querySelectorAll('fieldset[data-i]').forEach(fs=>{const b=B[+fs.dataset.i],q=n=>fs.querySelector(`[name=${n}]`).value;
         b.name=q('name').trim();b.why=q('why').trim();b.cost=q('cost');b.unit=q('unit');b.goal=Math.max(1,Math.round(+q('goal'))||30);
         const d=q('start');if(d)b.start=pd(d).getTime()});
-      f.querySelectorAll('.grow').forEach(r=>{const g=G[+r.dataset.g];g.name=r.querySelector('[name=gn]').value.trim();g.target=Math.max(1,Math.round(+r.querySelector('[name=gt]').value)||1);
+      // a renamed good habit stays the swap it was
+      f.querySelectorAll('.grow').forEach(r=>{const g=G[+r.dataset.g],n=r.querySelector('[name=gn]').value.trim();if(g.name&&n&&n!==g.name)B.forEach(b=>b.reps=b.reps.map(x=>x===g.name?n:x));g.name=n;g.target=Math.max(1,Math.round(+r.querySelector('[name=gt]').value)||1);
         const [l,x]=r.querySelector('[name=gl]').value.split(':');if(l){g.link=l;if(x)g.ex=x;else delete g.ex}else{delete g.link;delete g.ex}});
     };
     const add=n=>{n=n.trim();if(n&&!G.some(g=>g.name.toLowerCase()===n.toLowerCase()))G.push({name:n,target:1,...guess(n)})};
@@ -850,7 +863,9 @@ function habitsForm(pick){
       ev.preventDefault();sync();
       const bad=B.filter(b=>b.name),good=G.filter(g=>g.name);
       if(!bad.length){$('#pv').innerHTML='<b class="neg">Name the habit to break</b>';return}
-      bad.forEach(b=>{b.cost=b.cost===''?'':Math.max(0,+b.cost);b.reps=b.reps.filter(r=>good.some(g=>g.name===r))});
+      bad.forEach(b=>{b.cost=b.cost===''?'':Math.max(0,+b.cost);b.reps=[...new Set(b.reps)].filter(r=>good.some(g=>g.name===r))});
+      // and keeps its history: its ticks and the swaps logged with urges move to the new name
+      const mv=new Map(good.filter(g=>was.has(g)&&was.get(g)!==g.name).map(g=>[was.get(g),g.name]));S.log.forEach(e=>{if(mv.has(e.g))e.g=mv.get(e.g)});
       S.bad=bad;S.good=good;save();dlg.close();render();toast('Habits saved');
     };
   };
@@ -862,6 +877,7 @@ function habitsForm(pick){
    you through it. Finish with BEAT IT (and the swap you did) or SLIPPED. Kept in localStorage like the other apps. */
 let R=null,RI=0,RA=0,WL=null,AC=null;
 try{R=JSON.parse(localStorage.getItem(RUN))}catch(e){}
+if(!(fin(R?.t0)&&badOf(R.b)))R=null;   // a broken run (or one for a habit that's gone) would lock the screen in a surf
 const keepRun=()=>{try{localStorage.setItem(RUN,JSON.stringify(R))}catch(e){}};
 const elapsed=()=>Date.now()-R.t0;
 const rpick=(n,label,v)=>`<span class="k">${label}</span><div class="rate" data-n="${n}">${[1,2,3,4,5,6,7,8,9,10].map(i=>`<button type="button" data-r="${i}"${v===i?' class="on"':''}>${i}</button>`).join('')}</div>`;
@@ -1029,8 +1045,9 @@ function entryForm(t){
     const lg=LINKS[S.good.find(x=>x.name===e.g.value)?.link];
     if(ty==='done'&&lg&&!(t&&t.g===e.g.value)){$('#pv').innerHTML=`<b class="amb">Log ${esc(e.g.value)} in ${lg.app}: it ticks off here by itself</b>`;return}
     if(ty!=='slip'&&e.g.value)v.g=e.g.value;
+    if(ty==='resist'&&v.g&&lg)v.lk=1;   // a swap saved in its own app counts from there, as after a surf
     if(ty==='done'&&!v.g){$('#pv').innerHTML='<b class="neg">Pick the good habit</b>';return}
-    if(t){const o=S.log.find(x=>x.id===t.id);if(o.g!==v.g)delete o.sg;['b','g','int','trig'].forEach(k=>delete o[k]);Object.assign(o,v)}else S.log.push({id:uid(),...v});
+    if(t){const o=S.log.find(x=>x.id===t.id);if(o.g!==v.g)delete o.sg;['b','g','int','trig','lk'].forEach(k=>delete o[k]);Object.assign(o,v)}else S.log.push({id:uid(),...v});
     save();dlg.close();setMonth(v.at);render();
   };
   dlg.showModal();
@@ -1224,9 +1241,9 @@ document.addEventListener('change',e=>{const k=e.target.dataset.f;if(!k)return;U
 $('#file').addEventListener('change',async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
   try{
-    const s=JSON.parse(await f.text());if(!Array.isArray(s.log))throw 0;
-    if(!confirm(`Replace everything here with this backup (${s.log.length} entries)?`))return;
-    S={bad:s.bad||[],good:s.good||[],log:s.log,notes:s.notes||{}};save();boot();toast('Backup restored');
+    const s=JSON.parse(await f.text());if(!Array.isArray(s?.log)||!Array.isArray(s.bad))throw 0;const n=clean(s);   // bad: MIND's and TRAINING's backups have a log too
+    if(!confirm(`Replace everything here with this backup (${n.log.length} entries)?`))return;
+    S=n;save();boot();toast('Backup restored');
   }catch(x){toast('Not a valid backup file')}
 });
 
@@ -1296,7 +1313,12 @@ function heroToday(){
     action:{label:'Urge',attrs:{'data-a':'urge'}},
     log:L.map(e=>({at:e.at,tag:e.t==='slip'?'Slip':e.t==='resist'?'Urge beaten':'Good habit',text:e.t==='done'?`${e.g}${e.src?' · via '+e.src:''}`:`${badOf(e.b)?.name||''}${e.g?' → '+e.g:''}`,tone:e.t==='slip'?'neg':'pos'}))});
 }
-{const r0=render;render=function(...a){r0.apply(this,a);UI.animate($('#app'));UI.animate($('#top'),{onDone:l=>toast(`${l.join(' + ')} ✓`)})};UI.animate($('#top'));UI.animate($('#app'))}
+// a redraw replaces the button that had focus (the + DONE or EDIT a closed form hands focus back to): focus its twin
+{const r0=render;render=function(...a){const f=document.activeElement,k=f?.dataset?.a&&f.closest('#app,#top')?`[data-a="${f.dataset.a}"]${f.dataset.v!=null?`[data-v="${CSS.escape(f.dataset.v)}"]`:':not([data-v])'}`:'',i=k?[...document.querySelectorAll(k)].indexOf(f):-1;
+  r0.apply(this,a);if(k&&!f.isConnected)document.querySelectorAll(k)[i]?.focus({preventScroll:true});UI.animate($('#app'));UI.animate($('#top'),{onDone:l=>toast(`${l.join(' + ')} ✓`)})};UI.animate($('#top'));UI.animate($('#app'))}
+// back in the app (an iPhone home-screen app resumes where it was, maybe the next day): today, the clean time and the
+// danger hour are drawn again for now
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 </script>
 </body>
