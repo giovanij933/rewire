@@ -1000,7 +1000,7 @@ function outcomeForm(){
    <label>Note<textarea name="note" rows="3" placeholder="${R.slipped?'Where, when, what would help next time.':'What helped.'}"></textarea></label>
    <div class="fa2"><button type="button" class="ghost" id="ox">DISCARD</button>${R.slipped?'':'<button type="button" id="os">ACTUALLY SLIPPED</button><button type="button" id="oo" hidden>SAVE &amp; OPEN</button>'}<button class="pri">SAVE</button></div></form>`;
   const f=$('#of');
-  $('#ox').onclick=()=>{if(confirm('Discard this urge without logging it?')){clearRun();dlg.close()}};
+  $('#ox').onclick=async()=>{if(await UI.confirm({title:'Discard this urge?',body:'It ends without being logged.',ok:'Discard',cancel:'Keep it',danger:true})){clearRun();dlg.close()}};
   $('#os')&&($('#os').onclick=()=>{R.slipped=true;keepRun();draw()});
   // the swap lives in another app: save, then go there
   const lkOf=n=>LINKS[S.good.find(g=>g.name===n)?.link];
@@ -1216,7 +1216,8 @@ const ACT={
   rvcopy:()=>{const t=reviewText();(navigator.clipboard?.writeText(t)||Promise.reject()).then(()=>toast('Review copied'),()=>toast('Copy failed — select the text instead'))},
   done:v=>doneForm(S.good.find(x=>x.name===v)||{name:v,target:1}),
   bak:()=>dl(`rewire-backup-${ymd(new Date())}.json`,JSON.stringify(S),'application/json'),
-  clear:()=>{if(confirm('Delete ALL habits, entries and notes on this device?')){S={bad:[],good:[],log:[],notes:{}};save();U.range='all';U.h='all';U.x={};boot()}},
+  clear:()=>UI.confirm({title:'Delete everything?',body:'All habits, entries and notes on this device are deleted. Back up first if you might want them.',ok:'Delete all',danger:true})
+    .then(ok=>{if(ok){S={bad:[],good:[],log:[],notes:{}};save();U.range='all';U.h='all';U.x={};boot()}}),
   prev:()=>shift(-1),next:()=>shift(1),tod:()=>{setMonth(Date.now());render()},
   day:v=>{U.range=U.range===v?'all':v;U.page=0;render()},
   rng:v=>{U.range=U.range===v?'all':v;U.page=0;render()},   // the Today card's period tiles; tap again for all time
@@ -1225,7 +1226,9 @@ const ACT={
   xclr:k=>{if(k==='range')U.range='all';else delete U.x[k];U.page=0;render()},
   xall:()=>{U.x={};if(/^\d{4}-/.test(U.range))U.range='all';U.page=0;render()},
   edit:v=>{const e=S.log.find(t=>t.id===v);if(e?.t==='done')return doneForm({name:e.g,target:1},e);entryForm(e)},
-  del:v=>{if(confirm('Delete this entry?')){S.log=S.log.filter(t=>t.id!==v);save();render()}},
+  // a delete happens at once and can be taken back from the toast (the entry goes back where it was)
+  del:v=>{const i=S.log.findIndex(t=>t.id===v);if(i<0)return;const[t]=S.log.splice(i,1);save();render();
+    UI.undo('Entry deleted',()=>{S.log.splice(Math.min(i,S.log.length),0,t);save();render()})},
   pp:()=>{U.page--;render()},pn:()=>{U.page++;render()}
 };
 function shift(k){const d=new Date(U.month.y,U.month.m+k,1);U.month={y:d.getFullYear(),m:d.getMonth()};render()}
@@ -1242,7 +1245,7 @@ $('#file').addEventListener('change',async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
   try{
     const s=JSON.parse(await f.text());if(!Array.isArray(s?.log)||!Array.isArray(s.bad))throw 0;const n=clean(s);   // bad: MIND's and TRAINING's backups have a log too
-    if(!confirm(`Replace everything here with this backup (${n.log.length} entries)?`))return;
+    if(!await UI.confirm({title:'Restore this backup?',body:`Everything here is replaced with the backup's ${n.log.length} entries.`,ok:'Replace',danger:true}))return;
     S=n;save();boot();toast('Backup restored');
   }catch(x){toast('Not a valid backup file')}
 });
