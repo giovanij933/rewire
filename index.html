@@ -287,9 +287,10 @@ dialog.rvd{width:min(680px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
 <dialog id="dlg"></dialog>
 <div id="toast" role="status"></div>
 
+<script src="db.js"></script>
 <script src="sync.js" data-keys="isx.rewire.v1"></script>
 <script src="ui.js"></script>
-<script>
+<script type="isx/app">
 'use strict';
 const KEY='isx.rewire.v1', RUN='isx.rewire.run', PAGE=20, DAY=864e5;
 const RANGES={today:'Today',week:'This week',month:'This month',all:'All time'};
