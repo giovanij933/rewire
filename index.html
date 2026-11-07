@@ -1069,27 +1069,50 @@ function exportCSV(){
   dl(`rewire-${ymd(new Date())}.csv`,rows.map(r=>r.map(q).join(',')).join('\n'),'text/csv');
 }
 function sample(){
-  // four weeks of quitting doomscrolling: urges get rarer and weaker, two early slips
+  // a year of quitting doomscrolling: four or five urges a day at first, strong ones, with a slip most days of the first
+  // weeks; fewer and weaker as the months go on, a relapse in the stressful spring, and by now about one mild urge a day.
+  // Late night is the peak, then the morning phone check and the work break. Most beaten urges end in the swap, and the
+  // good habits get ticked more often as the year goes on. Fixed seed: the same sample every time, only the dates move.
+  let s=20251110;const rnd=()=>((s=Math.imul(s^s>>>15,2246822507)^Math.imul(s^s>>>13,3266489909),(s^=s>>>16)>>>0)/4294967296);
+  const pick=a=>a[Math.floor(rnd()*a.length)],gs=()=>Math.sqrt(-2*Math.log(1-rnd()))*Math.cos(2*Math.PI*rnd());
   const now=new Date(),id=uid(),at=(ago,h,m)=>new Date(now.getFullYear(),now.getMonth(),now.getDate()-ago,h,m).getTime();
-  S.bad=[{id,name:'Doomscrolling',why:'Sleep earlier and actually finish books.',cost:20,unit:'min',goal:30,start:at(27,8,0),reps:['Read 5 pages','Walk 10 min','Breathing reset']}];
+  S.bad=[{id,name:'Doomscrolling',why:'Sleep earlier and actually finish books.',cost:20,unit:'min',goal:90,start:at(364,8,0),reps:['Read 5 pages','Walk 10 min','Breathing reset']}];
   S.good=[{name:'Read 5 pages',target:1},{name:'Walk 10 min',target:1},{name:'Breathing reset',target:2},{name:'Drink water',target:3},{name:'Meditate',target:1,link:'meditate'},{name:'Workout',target:1,link:'workout'}];
   S.good.forEach(g=>{if(!g.link)Object.assign(g,guess(g.name)||{})});S.lv=2;   // sample ticks stay here: never write demo data into the other apps
-  // each time of day has its usual triggers and the swap that tends to follow; the two slips came after 3-minute surfs
-  const T={22:['Late night','Phone in hand','Late night','Tired'],13:['Work break','Boredom','Work break','Stress'],8:['Phone in hand','Boredom','Phone in hand'],17:['Tired','Stress','Boredom']};
-  const SW={22:'Read 5 pages',13:'Walk 10 min',8:'Breathing reset',17:'Walk 10 min'},reps=S.bad[0].reps;
-  for(let ago=27;ago>=0;ago--){
-    const n=ago>18?4:ago>9?3:2;
-    for(let i=0;i<n;i++){
-      const h=[22,13,8,17][i];if(h===13&&ago%5===4)continue;   // some days have no midday urge: late night is the peak
-      const int=Math.max(2,Math.min(9,Math.round(8-(27-ago)*.18+((ago*7+i*3)%5-2)*.6)));
-      const slip=(ago===25&&i===0)||(ago===19&&i===0),t=at(ago,h,(ago*13+i*17)%60);if(t>Date.now())continue;
-      S.log.push({id:uid(),at:t,t:slip?'slip':'resist',b:id,int,trig:T[h][(ago+i)%T[h].length],mins:slip?3:[5,3,5,10,5][(ago+i)%5],note:'',...(slip?{}:{g:ago%4===3?reps[(ago+i)%3]:SW[h]})});
-    }
-    if(ago%2===0&&at(ago,7,30)<Date.now())S.log.push({id:uid(),at:at(ago,7,30),t:'done',g:'Drink water',note:''});
-    if(ago%3!==1&&at(ago,12,15)<Date.now())S.log.push({id:uid(),at:at(ago,12,15),t:'done',g:'Walk 10 min',note:''});
+  // each time of day: how likely an urge falls there, its usual triggers and the swap that tends to follow
+  const SLOT=[[22,.36,['Late night','Phone in hand','Tired'],'Read 5 pages'],[8,.24,['Phone in hand','Boredom'],'Breathing reset'],
+    [13,.2,['Work break','Boredom','Stress'],'Walk 10 min'],[17,.2,['Tired','Stress','Boredom'],'Walk 10 min']];
+  // the slips, by week: most in the first month, a few after, the spring relapse (weeks 17-20), then two in the second half
+  const SLIP={0:3,1:3,2:2,3:2,4:1,5:1,7:1,9:1,12:1,17:2,18:2,19:1,20:1,36:1,44:1};
+  const SN=['Opened it "just to check". Forty minutes gone.','Scrolled in bed until 1 AM.','Bad day, went straight for the phone.'];
+  let since=0,clean=0;
+  for(let ago=364;ago>=0;ago--){
+    const w=(364-ago)/7,wk=Math.floor(w),spring=wk>=16&&wk<22,key=ymd(new Date(at(ago,12,0)));
+    // urges a day: 4-5 at first, about one by now; more in the spring
+    const mean=.9+4*Math.exp(-w/7)+(spring?1.4:0),n=Math.max(0,Math.round(mean+gs()*.8));
+    // this week's slips land on its first days with urges; a slip takes the strongest urge of its day
+    let slips=SLIP[wk]&&(364-ago)%7<SLIP[wk]?1:0;const E=[];
+    for(let i=0;i<Math.max(n,slips);i++){
+      let u=rnd(),sl=SLOT[0];for(const x of SLOT){u-=x[1];if(u<0){sl=x;break}}
+      const [h,,trigs,swap]=sl,int=Math.max(1,Math.min(10,Math.round(3.4+4.6*Math.exp(-w/10)+(spring?1.5:0)+gs()*1.2))),t=at(ago,h,Math.floor(rnd()*59));
+      if(t>Date.now())continue;E.push({t,int,trig:pick(trigs),swap})}
+    E.sort((a,b)=>b.int-a.int).forEach((e,i)=>{
+      const slip=slips&&!i;if(slip)e.int=Math.max(e.int,7);
+      const mins=slip?pick([1,3,3]):pick([3,3,3,5,5,1,10]);
+      S.log.push({id:uid(),at:e.t,t:slip?'slip':'resist',b:id,int:e.int,trig:e.trig,mins,note:slip&&rnd()<.5?pick(SN):'',...(slip?{}:rnd()<.72?{g:rnd()<.8?e.swap:pick(S.bad[0].reps)}:{})})});
+    // good habits: water most days, the walk and reading more often as the year goes on, a breathing reset or two
+    const keep=.55+.3*(1-Math.exp(-w/12))-(spring?.12:0),tick=(h,m,g)=>{const t=at(ago,h,m);if(t<=Date.now())S.log.push({id:uid(),at:t,t:'done',g,note:''})};
+    for(let i=0,k=1+Math.round(rnd()*2+keep);i<k;i++)tick(8+i*4,10+Math.floor(rnd()*40),'Drink water');
+    if(rnd()<keep)tick(12,10+Math.floor(rnd()*30),'Walk 10 min');
+    if(rnd()<keep+.05)tick(21,30+Math.floor(rnd()*25),'Read 5 pages');
+    if(rnd()<keep-.1)tick(15,Math.floor(rnd()*50),'Breathing reset');
+    // the day's note at the milestones of a clean run, and after a slip in the spring
+    if(E.length&&slips){since=0;if(wk===17&&(364-ago)%7===0)S.notes[key]??='Work stress is back and so is the scrolling. Phone goes in the kitchen at 10 PM again.'}
+    else{since++;clean=Math.max(clean,since);const M={7:'A full week without a slip.',30:'30 days clean.',60:'60 days. Evenings feel longer.',90:'90 days. Didn\'t think I\'d get here.'};
+      if(M[since]&&since===clean)S.notes[key]??=M[since]}
   }
   // very early in the morning nothing has happened yet today: log one beaten urge just before now
-  const e=Date.now()-15*6e4;if(e>=at(0,0,0)&&!S.log.some(x=>x.at>=at(0,0,0)))S.log.push({id:uid(),at:e,t:'resist',b:id,int:4,trig:'Late night',mins:3,g:'Breathing reset',note:''});
+  const e=Date.now()-15*6e4;if(e>=at(0,0,0)&&!S.log.some(x=>x.at>=at(0,0,0)))S.log.push({id:uid(),at:e,t:'resist',b:id,int:3,trig:'Phone in hand',mins:3,g:'Breathing reset',note:''});
   save();boot();
 }
 
