@@ -468,7 +468,7 @@ const n1=v=>FMT.n1.format(+v);
 const fm=m=>{const t=Math.max(0,Math.round(m*60));return `${Math.floor(t/60)}:${pad(t%60)}`};
 const span=ms=>{ms=Math.max(0,ms);const d=Math.floor(ms/DAY),h=Math.floor(ms%DAY/36e5),m=Math.floor(ms%36e5/6e4);return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m`};
 const money=(v,u)=>u==='min'?(v>=60?`${Math.floor(v/60)}h ${Math.round(v%60)}m`:`${Math.round(v)}m`):'$'+FMT.n0.format(Math.round(v));
-const hr=h=>h==null?'—':new Date(2000,0,1,h).toLocaleTimeString('en-US',{hour:'numeric'});
+const HRS=[],hr=h=>h==null?'—':HRS[h]??=new Date(2000,0,1,h).toLocaleTimeString('en-US',{hour:'numeric'});   // 24 labels, each made once
 const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 
@@ -497,10 +497,19 @@ const badOf=id=>S.bad.find(b=>b.id===id);
 const isDone=e=>e.t==='done'||(e.t==='resist'&&e.g&&!e.lk);
 
 /* ---------- numbers ---------- */
-function inRange(day){
-  const today=ymd(new Date()),wk=s=>{const d=pd(s);d.setDate(d.getDate()-(d.getDay()+6)%7);return ymd(d)};
-  return U.range==='all'||(U.range==='today'?day===today:U.range==='week'?wk(day)===wk(today):U.range==='month'?day.slice(0,7)===today.slice(0,7):U.range==='year'?day.slice(0,4)===today.slice(0,4):day===U.range);
+// the test for the selected range, made once for each pass over the log (view runs a dozen times per redraw, over
+// every entry; working out today and its week again for each entry was most of a redraw's time)
+function ranger(){
+  const today=ymd(new Date()),r=U.range;
+  if(r==='all')return()=>true;
+  if(r==='today')return day=>day===today;
+  if(r==='week'){const a=pd(today);a.setDate(a.getDate()-(a.getDay()+6)%7);const b=new Date(a);b.setDate(b.getDate()+6);const lo=ymd(a),hi=ymd(b);return day=>day>=lo&&day<=hi}
+  if(r==='month'){const m=today.slice(0,7);return day=>day.slice(0,7)===m}
+  if(r==='year'){const y=today.slice(0,4);return day=>day.slice(0,4)===y}
+  return day=>day===r;
 }
+// the day an entry falls on, worked out once per time stamp
+const DAYOF=new Map(),dayOf=at=>{let d=DAYOF.get(at);if(d===undefined){d=ymd(new Date(at));DAYOF.set(at,d)}return d};
 // urge strength bands, for the Urge strength card's filter
 const BAND=['Mild 1–3','Medium 4–6','Strong 7–10'],band=v=>v==null?null:v<=3?0:v<=6?1:2;
 // the selected bad habit; good-habit check-offs always count (they belong to every habit).
@@ -508,9 +517,11 @@ const BAND=['Mild 1–3','Medium 4–6','Strong 7–10'],band=v=>v==null?null:v<
 // skip '*' leaves them all out (the daily review).
 function view(useRange=true,skip=''){
   const x=U.x,on=k=>skip!=='*'&&k!==skip&&x[k]!=null;
-  let T=[...S.log,...LK].map(e=>({...e,day:ymd(new Date(e.at))}))
-    .filter(e=>(U.h==='all'||e.t==='done'||e.b===U.h)&&(!useRange||inRange(e.day))&&(!on('g')||isDone(e)&&e.g===x.g)&&(!on('trig')||e.trig===x.trig)
-      &&(!on('band')||band(e.int)===x.band)&&(!on('hour')||new Date(e.at).getHours()===x.hour));
+  const inR=useRange?ranger():null,og=on('g'),ot=on('trig'),ob=on('band'),oh=on('hour');
+  let T=[];
+  for(const e of [...S.log,...LK]){const day=dayOf(e.at);
+    if((U.h==='all'||e.t==='done'||e.b===U.h)&&(!inR||inR(day))&&(!og||isDone(e)&&e.g===x.g)&&(!ot||e.trig===x.trig)
+      &&(!ob||band(e.int)===x.band)&&(!oh||new Date(e.at).getHours()===x.hour))T.push({...e,day})}
   // clean / slip days: decided by the slips the other filters leave, before the event filter takes them out
   if(on('dres')){const sl=new Set(T.filter(e=>e.t==='slip').map(e=>e.day));T=T.filter(e=>sl.has(e.day)===(x.dres==='slip'))}
   if(on('ev'))T=T.filter(e=>e.t===x.ev);
@@ -770,8 +781,8 @@ function render(){
   const hrAt=i=>({a:`data-a="xf" data-v="hour:${i}"`,title:`${hr(i)}: ${sh.hours[i]} urge${sh.hours[i]===1?'':'s'} — click to show only this`,off:U.x.hour!=null&&U.x.hour!==i});
   xfBar();
 
-  $('#top').innerHTML=heroToday();
-  $('#app').innerHTML=`${S.bad.length?'':`<div class="card empty"><p class="h">What do you want to break?</p><p class="dim">Name the habit, then choose the good habits that replace it. Good habits can link to MIND, TRAINING, NUTRITION, LEARN and JOURNAL and tick themselves off when you log there.</p>
+  UI.paint($('#top'),heroToday(),{now:true});
+  UI.paint($('#app'),`${S.bad.length?'':`<div class="card empty"><p class="h">What do you want to break?</p><p class="dim">Name the habit, then choose the good habits that replace it. Good habits can link to MIND, TRAINING, NUTRITION, LEARN and JOURNAL and tick themselves off when you log there.</p>
    <form id="ob" class="chips"><input name="n" required autocomplete="off" placeholder="The habit to break" aria-label="The habit to break" style="flex:1;min-width:200px;width:auto"><button class="pri">START</button><button type="button" data-a="sample">LOAD SAMPLE</button></form></div>`}
 <section class="g g4">
  <div class="card"><p class="h">Clean streak</p><div class="k">Since last slip</div><div class="big pos">${S.bad.length?span(st.cur):'—'}</div>
@@ -805,7 +816,7 @@ function render(){
   ${stg.trig.length?stg.trig.slice(0,7).map(([k,v])=>`<div class="ev pick${U.x.trig===k?' on':''}"${xa('trig:'+k)}><span>${esc(k)}</span><b>${v.n} <span class="${v.s?'neg':'dim'}">· ${pct(v.s,v.n)} slip</span></b></div><div class="hb"><i class="${v.s/v.n>.5?'bgn':'bga'}" style="width:${(v.n/stg.trig[0][1].n*100).toFixed(1)}%"></i></div>`).join(''):ND}</div>
 </section>
 ${table(T)}
-<footer><p>Urges rise, peak and pass, usually within minutes. Surf them, swap in a good habit, and the old loop weakens each time. If a habit involves alcohol, drugs or gambling and feels out of your control, talk to a doctor or a support line — stopping some substances suddenly needs medical help.</p></footer>`;
+<footer><p>Urges rise, peak and pass, usually within minutes. Surf them, swap in a good habit, and the old loop weakens each time. If a habit involves alcohol, drugs or gambling and feels out of your control, talk to a doctor or a support line — stopping some substances suddenly needs medical help.</p></footer>`);
 }
 
 /* ---------- habits setup ---------- */
