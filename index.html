@@ -922,7 +922,11 @@ dlg.addEventListener('click',e=>{
   const on=b.classList.contains('on');b.parentNode.querySelectorAll('.on').forEach(x=>x.classList.remove('on'));
   if(!on)b.classList.add('on');b.dispatchEvent(new Event('input',{bubbles:true}));
 });
-dlg.addEventListener('cancel',e=>{if(R)e.preventDefault()});
+// Esc (or a swipe down) never drops an urge: a surf under way goes down to the bar at the bottom (UI.runBar), where a
+// tap brings it back; one that's over and waiting to be saved stays. The surf's clock carries on underneath, and when
+// it runs out the sheet comes back to log how it went
+dlg.addEventListener('cancel',e=>{if(!R)return;e.preventDefault();if(!R.end&&window.UI?.runBar)putAway()});
+function putAway(){dlg.close();UI.runBar({label:`Surf · ${badOf(R.b)?.name||'urge'}`,text:()=>R&&!R.end?$('#clk')?.textContent||'':'',open:()=>{if(R)draw()}})}
 function bell(n=1){
   try{
     AC??=new (window.AudioContext||window.webkitAudioContext)();AC.resume();
@@ -939,8 +943,8 @@ function breath(ms){
   for(const[c,d]of CALM){const to=c==='INHALE'?1:.45;if(x<d)return {c,left:Math.ceil(d-x),s:s+(to-s)*(1-Math.cos(Math.PI*x/d))/2};x-=d;s=to}
   return {c:'',left:0,s};
 }
-function clearRun(){clearInterval(RI);cancelAnimationFrame(RA);RI=0;R=null;try{localStorage.removeItem(RUN)}catch(e){}wake(false)}
-function draw(){clearInterval(RI);cancelAnimationFrame(RA);if(R.end)outcomeForm();else surfView();sheet();if(!dlg.open)dlg.showModal()}
+function clearRun(){window.UI?.runBar?.(null);clearInterval(RI);cancelAnimationFrame(RA);RI=0;R=null;try{localStorage.removeItem(RUN)}catch(e){}wake(false)}
+function draw(){window.UI?.runBar?.(null);clearInterval(RI);cancelAnimationFrame(RA);if(R.end)outcomeForm();else surfView();sheet();if(!dlg.open)dlg.showModal()}
 
 /* Pre-filled from your patterns (pfill): with several habits, the one your urges near this hour are mostly about;
    its usual trigger now; the surf length that has worked best (else the last one used). bid = the habit you tapped,
