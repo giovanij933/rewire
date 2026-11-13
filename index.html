@@ -199,6 +199,13 @@ dialog.ss h3{align-self:center;text-align:center;font-size:11px;font-weight:600;
 dialog.ss .chips{gap:8px;margin:6px 0 20px}
 dialog.ss .chips button{padding:9px 12px}
 dialog.ss .chips button,dialog.ss .rate button{transition:background-color .18s,border-color .18s,color .18s}
+/* where an urge sits (urgemap.js): tap the body or a place while you surf; the card lights the body by how often */
+.ub-fig{display:block;width:auto;height:auto}.ub-fig polygon{fill:color-mix(in srgb,var(--text-muted) 22%,var(--track));transition:fill .18s}
+.ub-fig .ub-p{fill:var(--accent)}.ub-fig .ub-s{fill:color-mix(in srgb,var(--accent) 40%,var(--track))}.ub-fig [data-ub]{cursor:pointer}
+dialog.ss .ub{display:flex;align-items:center;gap:16px;margin:0 0 10px;text-align:left}dialog.ss .ub .ub-fig{height:124px;flex:none}
+dialog.ss .bub:has(~.ub){width:min(62vw,260px);margin-bottom:14px}
+dialog.ss .ub .k{display:block;margin-bottom:6px}dialog.ss .ub .chips{gap:6px;margin:0}dialog.ss .ub .chips button{padding:7px 10px;font-size:12px}
+.ubm{display:flex;gap:18px;align-items:center}.ubm .hb i.ubl{background:color-mix(in srgb,var(--accent) 40%,var(--track))}.ubm .ub-fig{height:190px;flex:none}.ubm>div{flex:1;min-width:0}.ubm+p{margin:14px 0 0;font-size:13px;line-height:1.5}
 dialog.ss .rate{gap:6px;margin:6px 0 20px}
 dialog.ss .rate button{padding:10px 0}
 dialog.ss label{margin-bottom:6px}
@@ -286,6 +293,7 @@ dialog.rvd{width:min(680px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
 <script src="db.js"></script>
 <script src="sync.js" data-keys="isx.rewire.v1"></script>
 <script src="ui.js"></script>
+<script src="urgemap.js"></script>
 <script type="isx/app">
 'use strict';
 const KEY='isx.rewire.v1', RUN='isx.rewire.run', PAGE=20, DAY=864e5;
@@ -471,7 +479,8 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 /* ---------- state ----------
    bad:  habits to break  {id,name,why,cost,unit:'$'|'min',goal(days),start(ms),reps:[good habit names]}
    good: habits to build  {name,target(per day)}
-   log:  {id,at,t:'resist'|'slip'|'done',b(bad id),g(good name),int(1-10),trig,note} — a resisted urge may carry the swap it led to
+   log:  {id,at,t:'resist'|'slip'|'done',b(bad id),g(good name),int(1-10),trig,note} — a resisted urge may carry the swap it led to;
+         a surfed urge, where it was felt (body: ['chest', 'stomach', ...], the places in urgemap.js)
          (sg: the app's suggestion, left as it was; lk: a swap that counts from its own app) and the surf length (mins) */
 let S=load();
 const U={h:'all',range:'all',page:0,month:null,x:{}};   // x: cross-filters set by clicking a card (ev, dres, g, trig, band, hour)
@@ -513,11 +522,11 @@ const BAND=['Mild 1–3','Medium 4–6','Strong 7–10'],band=v=>v==null?null:v<
 // skip '*' leaves them all out (the daily review).
 function view(useRange=true,skip=''){
   const x=U.x,on=k=>skip!=='*'&&k!==skip&&x[k]!=null;
-  const inR=useRange?ranger():null,og=on('g'),ot=on('trig'),ob=on('band'),oh=on('hour');
+  const inR=useRange?ranger():null,og=on('g'),ot=on('trig'),ob=on('band'),oh=on('hour'),ou=on('body');
   let T=[];
   for(const e of [...S.log,...LK]){const day=dayOf(e.at);
     if((U.h==='all'||e.t==='done'||e.b===U.h)&&(!inR||inR(day))&&(!og||isDone(e)&&e.g===x.g)&&(!ot||e.trig===x.trig)
-      &&(!ob||band(e.int)===x.band)&&(!oh||new Date(e.at).getHours()===x.hour))T.push({...e,day})}
+      &&(!ob||band(e.int)===x.band)&&(!oh||new Date(e.at).getHours()===x.hour)&&(!ou||e.body?.includes(x.body)))T.push({...e,day})}
   // clean / slip days: decided by the slips the other filters leave, before the event filter takes them out
   if(on('dres')){const sl=new Set(T.filter(e=>e.t==='slip').map(e=>e.day));T=T.filter(e=>sl.has(e.day)===(x.dres==='slip'))}
   if(on('ev'))T=T.filter(e=>e.t===x.ev);
@@ -729,13 +738,25 @@ function planRow(){
 // the log's columns, for sorting and filtering (UI.filter); the last column holds the row's buttons
 const LOGC=[{label:'Time (local)',get:e=>e.at,type:'time'},{label:'Event',get:e=>e.t==='done'?'Good':e.t==='slip'?'Slip':'Beat urge'},{label:'Breaking',get:e=>e.b?badOf(e.b)?.name:null},
   {label:'Good habit',get:e=>e.g},{label:'Urge',get:e=>e.int,type:'num'},{label:'Trigger',get:e=>e.trig},{label:'Note',get:e=>e.note},null];
+// where urges sit: of the urges you marked, how often each place came up, the body lit by it (the most frequent solid,
+// any with a tenth or more light), and where the strongest ones sit (the highest average strength, 3 urges or more)
+function whereCard(T){
+  const M=T.filter(e=>e.t!=='done'&&e.body?.length),P={};
+  M.forEach(e=>e.body.forEach(k=>{const p=P[k]??={n:0,i:0,ni:0,r:0};p.n++;if(e.int!=null){p.i+=e.int;p.ni++}if(e.t==='resist')p.r++}));
+  const L=Object.entries(P).sort((a,b)=>b[1].n-a[1].n),top=L[0]?.[0],lit=L.filter(([,v])=>v.n>=M.length*.1).map(([k])=>k);
+  const st=L.filter(([,v])=>v.ni>=3).sort((a,b)=>b[1].i/b[1].ni-a[1].i/a[1].ni)[0];
+  return `<section class="g"><div class="card"><p class="h">Where urges sit</p><div class="k">${M.length?`Where you felt ${M.length} urge${M.length===1?'':'s'}`:'Where you feel them'}</div>
+  ${M.length?`<div class="ubm">${UBM.fig(top?[top]:[],lit.filter(k=>k!==top))}<div>${L.map(([k,v])=>`<div class="ev pick${U.x.body===k?' on':''}"${xa('body:'+k)}><span>${esc(UBM.name(k))}</span><b>${pct(v.n,M.length)}${v.ni?` <span class="dim">· ${(v.i/v.ni).toFixed(1)} avg</span>`:''}</b></div><div class="hb"><i class="${k===top?'bga':'ubl'}" style="width:${(v.n/L[0][1].n*100).toFixed(1)}%"></i></div>`).join('')}</div></div>
+  ${st?`<p>Your strongest urges sit in the <b>${esc(UBM.name(st[0]).toLowerCase())}</b>: ${(st[1].i/st[1].ni).toFixed(1)} / 10 on average over ${st[1].n} urge${st[1].n===1?'':'s'}, ${st[1].r} beaten.</p>`:''}`
+  :`<div class="ubm">${UBM.fig()}<div><p class="dim">While you surf an urge, tap where you feel it: chest, stomach, hands. Over time this shows where your urges sit, and which place holds the strongest ones.</p></div></div>`}</div></section>`;
+}
 function table(T){
   const F=UI.filter('log',LOGC,()=>{U.page=0;render()}),rows=F.apply([...T].reverse()),pages=Math.max(1,Math.ceil(rows.length/PAGE)),na='<span class="dim">—</span>';
   U.page=Math.min(Math.max(U.page,0),pages-1);
   const what=e=>e.t==='done'?`<b class="pos">GOOD</b>${e.src?` <span class="dim">· ${e.src}</span>`:''}`:e.t==='slip'?`<b class="neg">SLIP</b>`:`<b class="pos">BEAT URGE</b>`;
   const body=rows.slice(U.page*PAGE,(U.page+1)*PAGE).map(e=>`<tr>
    <td>${tfmt(e.at)}</td><td>${what(e)}</td><td>${e.b?esc(badOf(e.b)?.name||'—'):na}</td><td>${e.g?esc(e.g):na}${e.t==='done'&&doneDet(e)?`<div class="dim sm">${esc(doneDet(e))}</div>`:''}</td>
-   <td class="r">${e.int??na}</td><td class="dim">${esc(e.trig)||'—'}</td>
+   <td class="r">${e.int??na}</td><td class="dim">${esc(e.trig)||'—'}${e.body?.length&&window.UBM?`<div class="sm">felt in ${esc(UBM.words(e.body))}</div>`:''}</td>
    <td class="dim" title="${esc(e.note)}">${esc((e.note||'').length>40?e.note.slice(0,39)+'…':e.note||'')}</td>
    <td class="r">${e.ro?`<a class="btn sm" href="${appUrl(e.src)}" target="_blank" rel="noopener" data-app="${e.src}">${e.src}</a>`:`<button data-a="edit" data-v="${e.id}">EDIT</button> <button data-a="del" data-v="${e.id}" aria-label="Delete entry">X</button>`}</td></tr>`).join('');
   return `<div class="card"><div class="rowh"><p class="h">Log</p><button data-a="csv">EXPORT CSV</button></div>
@@ -750,7 +771,7 @@ const dayAt=(dk,vals,fmt)=>(i0,i1)=>{const a=dk[i0],b=dk[i1-1],one=i1-i0===1;
 // the active filters, as chips under the bar: click one to drop it
 function xfBar(){
   const x=U.x,c=[x.ev&&['ev',{resist:'Urges beaten',slip:'Slips'}[x.ev]],x.dres&&['dres',{clean:'Clean days',slip:'Slip days'}[x.dres]],x.g&&['g',esc(x.g)],
-    x.trig&&['trig',esc(x.trig)],x.band!=null&&['band','Urge '+BAND[x.band].toLowerCase()],x.hour!=null&&['hour','At '+hr(x.hour)],/^\d{4}-/.test(U.range)&&['range',dlabel(U.range)]].filter(Boolean);
+    x.trig&&['trig',esc(x.trig)],x.band!=null&&['band','Urge '+BAND[x.band].toLowerCase()],x.hour!=null&&['hour','At '+hr(x.hour)],x.body&&['body','Felt in '+(window.UBM?UBM.words([x.body]):x.body)],/^\d{4}-/.test(U.range)&&['range',dlabel(U.range)]].filter(Boolean);
   const el=$('#xf');el.hidden=!c.length;
   el.innerHTML=c.length?`<span>Filtered</span>${c.map(([k,l])=>`<button data-a="xclr" data-v="${k}" aria-label="Remove filter: ${l}"><b>${l}</b> ×</button>`).join('')}${c.length>1?'<button class="clr" data-a="xall">Clear all</button>':''}`:'';
 }
@@ -811,6 +832,7 @@ function render(){
  <div class="card"><p class="h">Triggers</p><div class="k">What sets urges off</div>
   ${stg.trig.length?stg.trig.slice(0,7).map(([k,v])=>`<div class="ev pick${U.x.trig===k?' on':''}"${xa('trig:'+k)}><span>${esc(k)}</span><b>${v.n} <span class="${v.s?'neg':'dim'}">· ${pct(v.s,v.n)} slip</span></b></div><div class="hb"><i class="${v.s/v.n>.5?'bgn':'bga'}" style="width:${(v.n/stg.trig[0][1].n*100).toFixed(1)}%"></i></div>`).join(''):ND}</div>
 </section>
+${window.UBM?whereCard(view(true,'body')):''}
 ${table(T)}
 <footer><p>Urges rise, peak and pass, usually within minutes. Surf them, swap in a good habit, and the old loop weakens each time. If a habit involves alcohol, drugs or gambling and feels out of your control, talk to a doctor or a support line — stopping some substances suddenly needs medical help.</p></footer>`);
 }
@@ -980,6 +1002,7 @@ function surfView(){
   <div class="bub" id="bub"><svg viewBox="0 0 240 240" aria-hidden="true"><circle class="rt" cx="120" cy="120" r="118"/><circle class="rp" id="pg" cx="120" cy="120" r="118" pathLength="100" stroke-dasharray="0 100"/></svg>
    <div class="ball" id="ball"></div><div class="cue" id="pc" aria-live="polite"></div></div>
   <p class="gp" id="gp"></p>
+  ${window.UBM?`<div class="ub" id="ub"></div>`:''}
   <div class="clock" id="clk"></div>
   ${reps.length?`<span class="k">Then swap in</span><div class="vl" id="sr">${reps.map(r=>`<button type="button" data-sr="${esc(r)}"${r===R.rep?' class="on"':''}>${esc(r)}${swapEm(r)?`<em>${swapEm(r)}</em>`:''}</button>`).join('')}</div>`:''}
   <div class="fa2"><button type="button" id="sl">I SLIPPED</button><button type="button" class="pri" id="sd">IT PASSED</button></div></div>`;
@@ -992,6 +1015,11 @@ function surfView(){
   };
   const anim=()=>{const b=$('#ball');if(!R||R.end||!b)return;b.style.transform=`scale(${breath(elapsed()).s.toFixed(3)})`;RA=requestAnimationFrame(anim)};
   RA=requestAnimationFrame(anim);
+  // where it sits: tap the body or a place to mark it, again to unmark; kept with the run, then with the urge
+  const ub=$('#ub'),paintUb=()=>{const B=R.body||[];ub.innerHTML=`${UBM.fig(B,[],1)}<div><span class="k">Where do you feel it?</span><div class="chips">${
+    UBM.REG.map(([k,,n])=>`<button type="button" data-ub="${k}" aria-pressed="${B.includes(k)}"${B.includes(k)?' class="on"':''}>${n}</button>`).join('')}</div></div>`};
+  if(ub){paintUb();ub.onclick=ev=>{const k=ev.target.closest('[data-ub]')?.dataset.ub;if(!k)return;const B=new Set(R.body||[]);B.has(k)?B.delete(k):B.add(k);
+    R.body=UBM.REG.map(r=>r[0]).filter(x=>B.has(x));keepRun();paintUb()}}
   dlg.querySelectorAll('[data-sr]').forEach(x=>x.onclick=()=>{R.rep=x.dataset.sr;R.ro=1;keepRun();dlg.querySelectorAll('[data-sr]').forEach(y=>y.classList.toggle('on',y===x));tick()});
   const finish=slip=>{clearInterval(RI);cancelAnimationFrame(RA);R.end=Date.now();R.slipped=slip;keepRun();wake(false);draw()};
   $('#sd').onclick=()=>finish(false);$('#sl').onclick=()=>finish(true);
@@ -1021,7 +1049,7 @@ function outcomeForm(){
   f.onsubmit=ev=>{
     ev.preventDefault();
     // mins: how long the surf was set for (not kept when you'd already slipped), for the next urge's surf length
-    const e={id:uid(),at:R.t0,t:R.slipped?'slip':'resist',b:R.b,int:R.int??rval('int'),trig:R.trig&&!R.tg?R.trig:cval('trig'),...(R.mins?{mins:R.mins}:{}),note:f.elements.note.value.trim()};
+    const e={id:uid(),at:R.t0,t:R.slipped?'slip':'resist',b:R.b,int:R.int??rval('int'),trig:R.trig&&!R.tg?R.trig:cval('trig'),...(R.mins?{mins:R.mins}:{}),...(R.body?.length?{body:R.body}:{}),note:f.elements.note.value.trim()};
     if(!R.slipped){const g=cval('rep');if(g)e.g=g;if(g&&g===R.sug&&!R.ro&&!own)e.sg=1;if(g&&LINKS[S.good.find(x=>x.name===g)?.link])e.lk=1}
     S.log.push(e);save();clearRun();dlg.close();setMonth(e.at);render();
     toast(e.t==='slip'?'Logged. Next urge, fresh start.':`Urge beaten${h?.cost?` · ${money(+h.cost,h.unit)} saved`:''}`);
@@ -1072,8 +1100,8 @@ function dl(name,text,type){const a=document.createElement('a');a.href=URL.creat
 function exportCSV(){
   const T=view();if(!T.length)return toast('Nothing to export');
   const q=v=>{v=String(v??'');return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v};
-  const rows=[['time','event','breaking','good_habit','details','app','urge','trigger','note'],
-    ...T.map(e=>[dtl(e.at),{done:'good habit',resist:'urge beaten',slip:'slip'}[e.t],badOf(e.b)?.name||'',e.g||'',e.t==='done'?doneDet(e):'',e.src||'',e.int??'',e.trig||'',e.note||''])];
+  const rows=[['time','event','breaking','good_habit','details','app','urge','trigger','felt_in','note'],
+    ...T.map(e=>[dtl(e.at),{done:'good habit',resist:'urge beaten',slip:'slip'}[e.t],badOf(e.b)?.name||'',e.g||'',e.t==='done'?doneDet(e):'',e.src||'',e.int??'',e.trig||'',(e.body||[]).join(' '),e.note||''])];
   dl(`rewire-${ymd(new Date())}.csv`,rows.map(r=>r.map(q).join(',')).join('\n'),'text/csv');
 }
 function sample(){
@@ -1093,6 +1121,11 @@ function sample(){
   // the slips, by week: most in the first month, a few after, the spring relapse (weeks 17-20), then two in the second half
   const SLIP={0:3,1:3,2:2,3:2,4:1,5:1,7:1,9:1,12:1,17:2,18:2,19:1,20:1,36:1,44:1};
   const SN=['Opened it "just to check". Forty minutes gone.','Scrolled in bed until 1 AM.','Bad day, went straight for the phone.'];
+  let s2=7331;const r2n=()=>((s2=Math.imul(s2^s2>>>15,2246822507)^Math.imul(s2^s2>>>13,3266489909),(s2^=s2>>>16)>>>0)/4294967296);
+  const FELT={'Late night':['head','head','hands','hands','chest'],'Phone in hand':['hands','hands','hands','hands','head'],'Tired':['head','head','shoulders','hands'],
+    'Boredom':['hands','hands','head','legs','legs'],'Work break':['hands','head','shoulders','legs'],'Stress':['chest','chest','stomach','stomach','shoulders','throat']};
+  const felt=(trig,int)=>{if(r2n()<.12)return null;const a=FELT[trig]||['chest'],B=new Set([a[Math.floor(r2n()*a.length)]]);
+    if(int>=7&&r2n()<.6)B.add(r2n()<.6?'chest':'stomach');else if(r2n()<.25)B.add(a[Math.floor(r2n()*a.length)]);return UBM.REG.map(r=>r[0]).filter(k=>B.has(k))};
   let since=0,clean=0;
   for(let ago=364;ago>=0;ago--){
     const w=(364-ago)/7,wk=Math.floor(w),spring=wk>=16&&wk<22,key=ymd(new Date(at(ago,12,0)));
@@ -1107,7 +1140,8 @@ function sample(){
     E.sort((a,b)=>b.int-a.int).forEach((e,i)=>{
       const slip=slips&&!i;if(slip)e.int=Math.max(e.int,7);
       const mins=slip?pick([1,3,3]):pick([3,3,3,5,5,1,10]);
-      S.log.push({id:uid(),at:e.t,t:slip?'slip':'resist',b:id,int:e.int,trig:e.trig,mins,note:slip&&rnd()<.5?pick(SN):'',...(slip?{}:rnd()<.72?{g:rnd()<.8?e.swap:pick(S.bad[0].reps)}:{})})});
+      const body=window.UBM?felt(e.trig,e.int):null;
+      S.log.push({id:uid(),at:e.t,t:slip?'slip':'resist',b:id,int:e.int,trig:e.trig,mins,...(body?{body}:{}),note:slip&&rnd()<.5?pick(SN):'',...(slip?{}:rnd()<.72?{g:rnd()<.8?e.swap:pick(S.bad[0].reps)}:{})})});
     // good habits: water most days, the walk and reading more often as the year goes on, a breathing reset or two
     const keep=.55+.3*(1-Math.exp(-w/12))-(spring?.12:0),tick=(h,m,g)=>{const t=at(ago,h,m);if(t<=Date.now())S.log.push({id:uid(),at:t,t:'done',g,note:''})};
     for(let i=0,k=1+Math.round(rnd()*2+keep);i<k;i++)tick(8+i*4,10+Math.floor(rnd()*40),'Drink water');
@@ -1168,7 +1202,7 @@ function review(day){
       (left==null?'':left>0?`${pl(left,'day')} to go to my ${st.goal}-day goal.`:`I've reached my ${st.goal}-day goal.`)+`</p>`:''));
   // the day in order
   const rows=T.map(e=>`<li>${hm(e.at)} · `+(e.t==='done'?`<b class="pos">Did ${esc(e.g)}</b>${doneDet(e)?' · '+esc(doneDet(e)):''}${e.src?` · via ${e.src}`:''}`
-    :`<b class="${e.t==='slip'?'neg':'pos'}">${e.t==='slip'?'Slipped':'Beat an urge'}</b> · ${nm(e)}${e.int!=null?` · strength ${e.int}/10`:''}${e.trig?` · ${esc(e.trig)}`:''}`)+
+    :`<b class="${e.t==='slip'?'neg':'pos'}">${e.t==='slip'?'Slipped':'Beat an urge'}</b> · ${nm(e)}${e.int!=null?` · strength ${e.int}/10`:''}${e.trig?` · ${esc(e.trig)}`:''}${e.body?.length&&window.UBM?` · felt in ${esc(UBM.words(e.body))}`:''}`)+
     (e.t==='resist'&&e.g||e.note?`<span class="tr"> ${e.t==='resist'&&e.g?`swapped in ${esc(e.g)}`:''}${e.t==='resist'&&e.g&&e.note?' · ':''}${e.note?`<q>${esc(e.note)}</q>`:''}</span>`:'')+`</li>`).join('');
   out+=sec('How it unfolded',T.length?`<ol>${rows}</ol>`:'');
   // what went well / what to look at
