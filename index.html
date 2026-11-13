@@ -908,7 +908,7 @@ function habitsForm(pick){
 let R=null,RI=0,RA=0,WL=null,AC=null;
 try{R=JSON.parse(localStorage.getItem(RUN))}catch(e){}
 if(!(fin(R?.t0)&&badOf(R.b)))R=null;   // a broken run (or one for a habit that's gone) would lock the screen in a surf
-const keepRun=()=>{try{localStorage.setItem(RUN,JSON.stringify(R))}catch(e){}};
+const keepRun=()=>{try{localStorage.setItem(RUN,JSON.stringify(R))}catch(e){}window.UI?.replan?.()};
 const elapsed=()=>Date.now()-R.t0;
 const rpick=(n,label,v)=>`<span class="k">${label}</span><div class="rate" data-n="${n}">${[1,2,3,4,5,6,7,8,9,10].map(i=>`<button type="button" data-r="${i}"${v===i?' class="on"':''}>${i}</button>`).join('')}</div>`;
 const rval=n=>{const b=dlg.querySelector(`.rate[data-n="${n}"] .on`);return b?+b.dataset.r:null};
@@ -943,7 +943,7 @@ function breath(ms){
   for(const[c,d]of CALM){const to=c==='INHALE'?1:.45;if(x<d)return {c,left:Math.ceil(d-x),s:s+(to-s)*(1-Math.cos(Math.PI*x/d))/2};x-=d;s=to}
   return {c:'',left:0,s};
 }
-function clearRun(){window.UI?.runBar?.(null);clearInterval(RI);cancelAnimationFrame(RA);RI=0;R=null;try{localStorage.removeItem(RUN)}catch(e){}wake(false)}
+function clearRun(){window.UI?.runBar?.(null);clearInterval(RI);cancelAnimationFrame(RA);RI=0;R=null;try{localStorage.removeItem(RUN)}catch(e){}window.UI?.replan?.();wake(false)}
 function draw(){window.UI?.runBar?.(null);clearInterval(RI);cancelAnimationFrame(RA);if(R.end)outcomeForm();else surfView();sheet();if(!dlg.open)dlg.showModal()}
 
 /* Pre-filled from your patterns (pfill): with several habits, the one your urges near this hour are mostly about;
@@ -1019,15 +1019,20 @@ function surfView(){
   };
   const anim=()=>{const b=$('#ball');if(!R||R.end||!b)return;b.style.transform=`scale(${breath(elapsed()).s.toFixed(3)})`;RA=requestAnimationFrame(anim)};
   RA=requestAnimationFrame(anim);
-  // where it sits: tap the body or a place to mark it, again to unmark; kept with the run, then with the urge
-  const ub=$('#ub'),paintUb=()=>{const B=R.body||[];ub.innerHTML=`${UBM.fig(B,[],1)}<div><span class="k">Where do you feel it?</span><div class="chips">${
-    UBM.REG.map(([k,,n])=>`<button type="button" data-ub="${k}" aria-pressed="${B.includes(k)}"${B.includes(k)?' class="on"':''}>${n}</button>`).join('')}</div></div>`};
-  if(ub){paintUb();ub.onclick=ev=>{const k=ev.target.closest('[data-ub]')?.dataset.ub;if(!k)return;const B=new Set(R.body||[]);B.has(k)?B.delete(k):B.add(k);
-    R.body=UBM.REG.map(r=>r[0]).filter(x=>B.has(x));keepRun();paintUb()}}
+  ubPick($('#ub'));
   dlg.querySelectorAll('[data-sr]').forEach(x=>x.onclick=()=>{R.rep=x.dataset.sr;R.ro=1;keepRun();dlg.querySelectorAll('[data-sr]').forEach(y=>y.classList.toggle('on',y===x));tick()});
   const finish=slip=>{clearInterval(RI);cancelAnimationFrame(RA);R.end=Date.now();R.slipped=slip;keepRun();wake(false);draw()};
   $('#sd').onclick=()=>finish(false);$('#sl').onclick=()=>finish(true);
   RI=setInterval(tick,250);tick();wake(true);
+}
+// where it sits (urgemap.js): the body and a button per place. A tap marks or unmarks one, kept with the run, then
+// with the urge. In the surf and again when you log it, so an urge you'd already slipped on gets it too
+function ubPick(el){
+  if(!el||!window.UBM)return;
+  const paint=()=>{const B=R.body||[];el.innerHTML=`${UBM.fig(B,[],1)}<div><span class="k">${R.end?'Where did you feel it?':'Where do you feel it?'}</span><div class="chips">${
+    UBM.REG.map(([k,,n])=>`<button type="button" data-ub="${k}" aria-pressed="${B.includes(k)}"${B.includes(k)?' class="on"':''}>${n}</button>`).join('')}</div></div>`};
+  paint();el.onclick=ev=>{const k=ev.target.closest('[data-ub]')?.dataset.ub;if(!k)return;ev.preventDefault();const B=new Set(R.body||[]);B.has(k)?B.delete(k):B.add(k);
+    R.body=UBM.REG.map(r=>r[0]).filter(x=>B.has(x));keepRun();paint()};
 }
 function outcomeForm(){
   const h=badOf(R.b),reps=swaps(h);
@@ -1035,11 +1040,12 @@ function outcomeForm(){
    ${R.slipped?`<p class="dim">A slip is data, not a verdict. Note what happened. The streak restarts now, and the next urge is a fresh chance.</p>`
    :`<p class="pos">You rode it out${R.end>R.t0?` in ${fm((R.end-R.t0)/60000)}`:''}. Each time, the loop gets weaker.</p>
      ${reps.length?`<span class="k">Swap you did</span>${cpick('rep',reps,R.rep,swapEm)}`:''}`}
+   ${window.UBM?'<div class="ub" id="ub"></div>':''}
    ${R.int==null?rpick('int','How strong was it? (1–10)'):''}
    ${R.trig&&!R.tg?'':`<span class="k">What set it off?</span>${cpick('trig',TRIG,R.trig,x=>R.tg&&x===R.trig?'pre-filled':'')}`}
    <label>Note<textarea name="note" rows="3" placeholder="${R.slipped?'Where, when, what would help next time.':'What helped.'}"></textarea></label>
    <div class="fa2"><button type="button" class="ghost" id="ox">DISCARD</button>${R.slipped?'':'<button type="button" id="os">ACTUALLY SLIPPED</button><button type="button" id="oo" hidden>SAVE &amp; OPEN</button>'}<button class="pri">SAVE</button></div></form>`;
-  const f=$('#of');
+  const f=$('#of');ubPick($('#ub'));
   $('#ox').onclick=async()=>{if(await UI.confirm({title:'Discard this urge?',body:'It ends without being logged.',ok:'Discard',cancel:'Keep it',danger:true})){clearRun();dlg.close()}};
   $('#os')&&($('#os').onclick=()=>{R.slipped=true;keepRun();draw()});
   // the swap lives in another app: save, then go there
@@ -1339,9 +1345,11 @@ function linkAll(){
    of the day it opens the plan (act 'plan': the Today card, scrolled to the row). Never an urge surf: you start one
    when an urge comes. Built from this app's log and the apps your good habits tick off from; save() rebuilds it. */
 let PK='';
-function planReg(){const src=[KEY,...new Set(S.good.map(g=>APPS[LINKS[g.link]?.app]?.key).filter(Boolean))];if(src.join()!==PK){PK=src.join();UI.planner('rewire',src,planRows)}else UI.replan()}
+function planReg(){const src=[KEY,RUN,...new Set(S.good.map(g=>APPS[LINKS[g.link]?.app]?.key).filter(Boolean))];if(src.join()!==PK){PK=src.join();UI.planner('rewire',src,planRows)}else UI.replan()}
 function planRows(){
   if(!S.bad.length)return [];
+  // an urge being surfed (or over and not logged yet) is TODAY's row, with the surf's clock: URGE brings it back
+  if(R&&badOf(R.b))return [{title:`Surf · ${badOf(R.b).name}`,sub:R.end?'Over · not logged yet':'',act:'urge',run:R.end?{saved:false}:{t0:R.t0,mins:R.mins||0},art:R.body?.length&&window.UBM?UBM.art(R.body,[]):undefined}];
   const L=[...S.log,...linked()],P=dangerPlan(L),bn=badOf(P.b)?.name||'',cut=(s,n)=>s.length>n?s.slice(0,n-1)+'…':s;
   // 12 AM: the plan is saved again only when the data or the date changes, so each row holds the night it's shown in:
   // the 12 AM hour the night you're in (P), the day and the 11 PM hour the night that starts at this day's 11 PM (Q)
