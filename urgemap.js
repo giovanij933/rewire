@@ -42,5 +42,13 @@ window.UBM=(()=>{
   const fig=(p=[],s=[],tap)=>`<svg class="ub-fig" viewBox="0 0 100 220" aria-hidden="true">${BODY.map(([r,ps])=>{const k=OF[r];
     const c=p.includes(k)?'ub-p':s.includes(k)?'ub-s':'';
     return ps.map(pt=>`<polygon${c?` class="${c}"`:''}${tap&&k?` data-ub="${k}"`:''} points="${pt}"/>`).join('')}).join('')}</svg>`;
-  return {REG,name,words,fig};
+  // TODAY's plan art (isionxxx ARCHITECTURE.md, 2h): a picture as a small SVG in the shared plan-art classes (pa-*), which
+  // TODAY colours with the palette, light or dark, so it shows without this app's CSS. M: class here → [pa classes, attributes]
+  const toArt=(svg,M)=>{try{const r=new DOMParser().parseFromString(svg,'image/svg+xml').documentElement;if(r.nodeName!=='svg')return '';
+    [r,...r.querySelectorAll('*')].forEach(e=>{const k=[];(e.getAttribute('class')||'').split(/\s+/).forEach(c=>{const m=M[c];if(!m)return;if(m[0])k.push(m[0]);for(const a in m[1]||{})e.setAttribute(a,m[1][a])});
+      e.removeAttribute('class');e.removeAttribute('style');e.removeAttribute('aria-hidden');if(k.length)e.setAttribute('class',k.join(' '))});
+    return new XMLSerializer().serializeToString(r)}catch(e){return ''}};
+  // TODAY's plan: where your urges sit, beside the danger hour
+  const art=(p,s)=>toArt(fig(p,s),{'ub-p':['pa-p'],'ub-s':['pa-s']});
+  return {REG,name,words,fig,art};
 })();

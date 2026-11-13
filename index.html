@@ -1342,9 +1342,13 @@ function planRows(){
   // 12 AM: the plan is saved again only when the data or the date changes, so each row holds the night it's shown in:
   // the 12 AM hour the night you're in (P), the day and the 11 PM hour the night that starts at this day's 11 PM (Q)
   const Q=P.h===0&&!new Date().getHours()?dangerPlan(L,1):P,title=`Danger hour ${hr(P.h)}`;
-  const row=(X,k,act,w)=>X.sw?{title,sub:cut(`${k}: ${X.sw.g} instead of ${bn}`,64),act,...w,...(X.done?{done:true}:{})}:{title:'Pick a swap',sub:cut(`Choose a good habit to replace ${bn}`,64),act:'swap',...w};
+  // art: where your urges sit over the last 90 days (the most frequent place solid, any with a tenth or more light), for
+  // TODAY's plan (urgemap.js)
+  const B=S.log.filter(e=>e.t!=='done'&&e.body?.length&&e.at>Date.now()-90*864e5),C={};B.forEach(e=>e.body.forEach(k=>C[k]=(C[k]||0)+1));
+  const top=Object.entries(C).sort((a,b)=>b[1]-a[1]),art=top.length&&window.UBM?UBM.art([top[0][0]],top.slice(1).filter(([,n])=>n>=B.length*.1).map(([k])=>k)):undefined;
+  const row=(X,k,act,w)=>({...(X.sw?{title,sub:cut(`${k}: ${X.sw.g} instead of ${bn}`,64),act,...w,...(X.done?{done:true}:{})}:{title:'Pick a swap',sub:cut(`Choose a good habit to replace ${bn}`,64),act:'swap',...w}),art});
   if(!P.sw&&!Q.sw)return [row(P)];
-  if(P.h==null)return [{title:cut('Swap ready: '+P.sw.g,28),sub:cut(`For ${bn} · log urges to find your danger hour`,64),act:'plan',...(P.done?{done:true}:{})}];
+  if(P.h==null)return [{title:cut('Swap ready: '+P.sw.g,28),sub:cut(`For ${bn} · log urges to find your danger hour`,64),act:'plan',...(P.done?{done:true}:{}),art}];
   if(P.h)return [row(P,'Now','swap',{h0:P.h-1,h1:(P.h+1)%24}),row(P,'Ready','plan')];
   return [row(Q,'Now','swap',{h0:23,h1:0}),row(P,'Now','swap',{h0:0,h1:1}),row(Q,'Ready','plan')];
 }
