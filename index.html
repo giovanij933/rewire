@@ -141,6 +141,10 @@ textarea{resize:vertical}
 .cue em{font-style:normal;font-size:28px;letter-spacing:0;color:var(--tx)}
 .clock{font-size:22px;font-weight:600;text-align:center;margin-bottom:4px;letter-spacing:.04em}
 .held .ball{opacity:.45}.held .cue,.clock.held{color:var(--dim)}
+/* the urge wave (UI.gl) takes the bubble's place once it's drawn, in the same circle; the cue moves up into the clear sky
+   above the water. The 2D bubble is what shows until then, or without WebGL */
+.bub canvas.wave{position:absolute;inset:16px;width:calc(100% - 32px);height:calc(100% - 32px);border-radius:50%;display:block}
+.bub.gl .ball{visibility:hidden}.bub.gl .cue{place-content:start center;padding-top:19%}
 .c{text-align:center}
 .cue small{font-size:10px;color:var(--dim);letter-spacing:.06em}
 .gp{text-align:center;min-height:3em;margin:4px 0 10px;font-size:14px;line-height:1.5;color:var(--tx)}
@@ -458,7 +462,7 @@ const CALM=[['INHALE',4],['EXHALE',6]];
 const $=s=>document.querySelector(s), dlg=$('#dlg');
 // session screens (start, live, done) open as a full-screen sheet; other dialogs keep the usual box
 const sheet=()=>dlg.classList.add('ss');
-dlg.addEventListener('close',()=>dlg.classList.remove('ss'));
+dlg.addEventListener('close',()=>{dlg.classList.remove('ss');waveOff()});
 
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
@@ -908,7 +912,7 @@ function habitsForm(pick){
 /* ---------- urge surfing ----------
    ▶ URGE: rate it, name the trigger, then surf it for a few minutes on the breathing bubble while prompts walk
    you through it. Finish with BEAT IT (and the swap you did) or SLIPPED. Kept in localStorage like the other apps. */
-let R=null,RI=0,RA=0,WL=null,AC=null;
+let R=null,RI=0,RA=0,WL=null,AC=null,WAVE=null,WAVEN=0;
 try{R=JSON.parse(localStorage.getItem(RUN))}catch(e){}
 if(!(fin(R?.t0)&&badOf(R.b)))R=null;   // a broken run (or one for a habit that's gone) would lock the screen in a surf
 const keepRun=()=>{try{localStorage.setItem(RUN,JSON.stringify(R))}catch(e){}window.UI?.replan?.()};
@@ -946,7 +950,51 @@ function breath(ms){
   for(const[c,d]of CALM){const to=c==='INHALE'?1:.45;if(x<d)return {c,left:Math.ceil(d-x),s:s+(to-s)*(1-Math.cos(Math.PI*x/d))/2};x-=d;s=to}
   return {c:'',left:0,s};
 }
-function clearRun(){window.UI?.runBar?.(null);clearInterval(RI);cancelAnimationFrame(RA);RI=0;R=null;try{localStorage.removeItem(RUN)}catch(e){}window.UI?.replan?.();wake(false)}
+function clearRun(){waveOff();window.UI?.runBar?.(null);clearInterval(RI);cancelAnimationFrame(RA);RI=0;R=null;try{localStorage.removeItem(RUN)}catch(e){}window.UI?.replan?.();wake(false)}
+
+/* the urge wave (UI.gl, ARCHITECTURE.md 2m): the bubble's circle becomes a small sea. Over the surf the waves rise to a
+   peak (a third of the way in), hold, and ease off to calm, the way an urge does, and the dot (you) rides the swell.
+   The far water fades out into the sheet behind it. The water still breathes with the pacer: it lifts as you breathe in and settles as you breathe out, so the cue and
+   the circle agree. Under Reduce Motion the waves hold still and only the breath and the urge's size change. It's drawn
+   only on top of the 2D bubble: no WebGL, no Three.js or any failure, and the bubble simply stays. */
+const SEAH=(x,y,t,a)=>a*(.55*Math.sin(x*.9+t*1.1)+.25*Math.sin(x*1.7-y*.8+t*1.6)+.12*Math.sin(y*2.3+x*.4+t*2.2))+.035*Math.sin(x*4+y*3+t*3);
+const SEAV=`uniform float uT; uniform float uAmp; uniform float uLift; varying float vH; varying vec3 vN; varying vec3 vV; varying float vD;
+float h(vec2 p){ return uAmp*(.55*sin(p.x*.9+uT*1.1)+.25*sin(p.x*1.7-p.y*.8+uT*1.6)+.12*sin(p.y*2.3+p.x*.4+uT*2.2))+.035*sin(p.x*4.0+p.y*3.0+uT*3.0); }
+void main(){ vec3 p=position; float e=.04; float H=h(p.xy);
+  vec3 nl=normalize(vec3(-(h(p.xy+vec2(e,0.0))-H)/e,-(h(p.xy+vec2(0.0,e))-H)/e,1.0));
+  p.z+=H+uLift; vH=H; vec4 wp=modelMatrix*vec4(p,1.0); vN=normalize(mat3(modelMatrix)*nl); vV=cameraPosition-wp.xyz;
+  vec4 mv=viewMatrix*wp; vD=-mv.z; gl_Position=projectionMatrix*mv; }`;
+const SEAF=`uniform vec3 uDeep; uniform vec3 uCrest; uniform vec3 uHot; uniform float uI;
+varying float vH; varying vec3 vN; varying vec3 vV; varying float vD;
+void main(){ vec3 n=normalize(vN); vec3 v=normalize(vV); vec3 L=normalize(vec3(-.5,.8,-.6));
+  float t=smoothstep(-.6,.8,vH); vec3 c=mix(uDeep,uCrest,t); c=mix(c,uHot,uI*t*.45);
+  float df=max(dot(n,L),0.0); float fr=pow(1.0-max(dot(n,v),0.0),3.0); float sp=pow(max(dot(reflect(-L,n),v),0.0),40.0);
+  c=c*(.55+.55*df)+fr*.15+sp*.3; gl_FragColor=vec4(c,1.0-smoothstep(2.5,11.0,vD)); }`;
+// how strong the urge is at p (0 → 1 through the surf): rises to a peak a third of the way in, holds, then eases off
+const URGE=p=>{const e=x=>.5-.5*Math.cos(Math.PI*Math.min(1,Math.max(0,x)));return p<.35?.12+.88*e(p/.35):p<.5?1:.12+.88*(1-e((p-.5)/.4))};
+function waveOff(){WAVEN++;if(WAVE){WAVE.dispose();WAVE.canvas.remove();WAVE=null}document.querySelectorAll('#bub canvas.wave').forEach(c=>c.remove());$('#bub')?.classList.remove('gl')}
+function waveOn(){
+  const bub=$('#bub');if(!bub||!window.UI?.gl?.ok())return;
+  const c=document.createElement('canvas'),n=++WAVEN;c.className='wave';c.setAttribute('aria-hidden','true');bub.insertBefore(c,$('#pc'));
+  UI.gl(c,s=>{
+    const T=s.THREE,mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);let br=.45,pr=0,tm=0;
+    s.camera=new T.PerspectiveCamera(36,1,.1,40);s.camera.position.set(0,.95,4.6);s.camera.lookAt(0,.6,-10);
+    const u={uT:{value:0},uAmp:{value:.1},uLift:{value:0},uI:{value:0},uDeep:{value:new T.Vector3()},uCrest:{value:new T.Vector3()},uHot:{value:new T.Vector3()}};
+    const sea=new T.Mesh(new T.PlaneGeometry(14,14,150,150),new T.ShaderMaterial({uniforms:u,transparent:true,vertexShader:SEAV,fragmentShader:SEAF}));
+    sea.rotation.x=-Math.PI/2;sea.position.z=-4;sea.updateMatrixWorld();
+    const me=new T.Mesh(new T.SphereGeometry(.07,20,14),new T.MeshBasicMaterial());
+    s.scene.add(sea,me);
+    const at=new T.Vector3();
+    s.theme=()=>{const bg=s.rgb('--background'),acc=s.rgb('--accent'),inf=s.rgb('--info'),wn=s.rgb('--warning'),dk=bg[0]+bg[1]+bg[2]<1.5;
+      u.uDeep.value.fromArray(mix(acc,bg,dk?.55:.5));u.uCrest.value.fromArray(mix(inf,bg,dk?.35:.25));u.uHot.value.fromArray(mix(wn,bg,dk?.35:.3));
+      me.material.color.setRGB(...s.rgb('--text-primary'),T.SRGBColorSpace)};
+    s.level=(b,p)=>{br=b;pr=Math.min(1,Math.max(0,p))};
+    s.running=()=>!!R&&!R.end;
+    s.update=dt=>{if(!s.still)tm+=dt;const i=URGE(pr),a=.08+.5*i,lift=-.12+.2*(br-.45)/.55;
+      u.uT.value=tm;u.uAmp.value=a;u.uLift.value=lift;u.uI.value=i;
+      sea.localToWorld(me.position.copy(at.set(0,-4.5,SEAH(0,-4.5,tm,a)+lift+.07)))};
+  }).then(s=>{if(!s){c.remove();return}if(n!==WAVEN||!c.isConnected){s.dispose();c.remove();return}WAVE=s;bub.classList.add('gl');s.update(0);s.draw();s.kick()});
+}
 function draw(){window.UI?.runBar?.(null);clearInterval(RI);cancelAnimationFrame(RA);if(R.end)outcomeForm();else surfView();sheet();if(!dlg.open)dlg.showModal()}
 
 /* Pre-filled from your patterns (pfill): with several habits, the one your urges near this hour are mostly about;
@@ -1004,7 +1052,7 @@ function urgeForm(bid){
 const swaps=h=>[...new Set([...(h?.reps||[]),R.sug].filter(Boolean))];
 const swapEm=n=>[n===R.sug?'suggested':'',swapApp(n)].filter(Boolean).join(' · ');
 function surfView(){
-  const h=badOf(R.b),reps=swaps(h);
+  waveOff();const h=badOf(R.b),reps=swaps(h);
   dlg.innerHTML=`<div><h3>Surf · ${esc(h?.name||'')}</h3>
   <div class="bub" id="bub"><svg viewBox="0 0 240 240" aria-hidden="true"><circle class="rt" cx="120" cy="120" r="118"/><circle class="rp" id="pg" cx="120" cy="120" r="118" pathLength="100" stroke-dasharray="0 100"/></svg>
    <div class="ball" id="ball"></div><div class="cue" id="pc" aria-live="polite"></div></div>
@@ -1020,11 +1068,11 @@ function surfView(){
     const b=breath(ms);$('#pc').innerHTML=`${b.c}<em>${b.left}</em>`;
     $('#gp').textContent=P[Math.min(P.length-1,Math.floor(ms/len*P.length))];
   };
-  const anim=()=>{const b=$('#ball');if(!R||R.end||!b)return;b.style.transform=`scale(${breath(elapsed()).s.toFixed(3)})`;RA=requestAnimationFrame(anim)};
-  RA=requestAnimationFrame(anim);
+  const anim=()=>{const b=$('#ball');if(!R||R.end||!b)return;const ms=elapsed(),s=breath(ms).s;b.style.transform=`scale(${s.toFixed(3)})`;if(WAVE){WAVE.level(s,ms/len);WAVE.kick()}RA=requestAnimationFrame(anim)};
+  RA=requestAnimationFrame(anim);waveOn();
   ubPick($('#ub'));
   dlg.querySelectorAll('[data-sr]').forEach(x=>x.onclick=()=>{R.rep=x.dataset.sr;R.ro=1;keepRun();dlg.querySelectorAll('[data-sr]').forEach(y=>y.classList.toggle('on',y===x));tick()});
-  const finish=slip=>{clearInterval(RI);cancelAnimationFrame(RA);R.end=Date.now();R.slipped=slip;keepRun();wake(false);draw()};
+  const finish=slip=>{waveOff();clearInterval(RI);cancelAnimationFrame(RA);R.end=Date.now();R.slipped=slip;keepRun();wake(false);draw()};
   $('#sd').onclick=()=>finish(false);$('#sl').onclick=()=>finish(true);
   RI=setInterval(tick,250);tick();wake(true);
 }
