@@ -1114,6 +1114,7 @@ function outcomeForm(){
     if(!R.slipped){const g=cval('rep');if(g)e.g=g;if(g&&g===R.sug&&!R.ro&&!own)e.sg=1;if(g&&LINKS[S.good.find(x=>x.name===g)?.link])e.lk=1}
     S.log.push(e);save();clearRun();dlg.close();setMonth(e.at);render();
     toast(e.t==='slip'?'Logged. Next urge, fresh start.':`Urge beaten${h?.cost?` · ${money(+h.cost,h.unit)} saved`:''}`);
+    if(e.t==='resist')setTimeout(()=>window.UI?.bloom?.(),350);   // an urge beaten (UI.bloom, ARCHITECTURE.md 2m)
   };
 }
 
@@ -1145,7 +1146,7 @@ function entryForm(t){
     if(ty==='resist'&&v.g&&lg)v.lk=1;   // a swap saved in its own app counts from there, as after a surf
     if(ty==='done'&&!v.g){$('#pv').innerHTML='<b class="neg">Pick the good habit</b>';return}
     if(t){const o=S.log.find(x=>x.id===t.id);if(o.g!==v.g)delete o.sg;['b','g','int','trig','lk'].forEach(k=>delete o[k]);Object.assign(o,v)}else S.log.push({id:uid(),...v});
-    save();dlg.close();setMonth(v.at);render();
+    save();dlg.close();setMonth(v.at);render();if(ty==='resist'&&!t)setTimeout(()=>window.UI?.bloom?.(),350);
   };
   dlg.showModal();
 }
@@ -1423,6 +1424,7 @@ function showPlan(){
 }
 function boot(){linkAll();setMonth(S.log.length?Math.max(...S.log.map(t=>t.at)):Date.now());render();planReg()}
 boot();
+window.UI?.backdrop?.({tint:['--warning','--accent','--info']});   // ARCHITECTURE.md 2m
 if(R)draw();
 // another ISIONXXX app can send you straight to an action here (REWIRE's LOG buttons): #do=<action> or a message
 // 'today' (from TODAY's rings and timeline): drop any card filters and show just today, as a chip you can clear.
