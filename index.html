@@ -261,6 +261,8 @@ dialog.ss .sw b{color:var(--text-primary);font-weight:600}dialog.ss .sw small{di
 .ui-nx .nxh{margin-top:12px;border-top:1px solid var(--line)}.ui-nx .nxh .sec.first{margin-top:10px}
 /* kept short there: each habit's count, not its last three times (the log and TODAY have those) */
 .ui-nx .nxh .dd{display:none}
+.ui-nx .nxh .sec:not(.first){border-top:0;padding-top:0;margin-top:14px}
+.ui-nx .nxd{margin:10px 0 0;font-size:12px;color:var(--dim)}.ui-nx .nxd b{font-weight:600;color:var(--text-primary)}
 h1.brand{margin:0}
 /* daily review: a script to read top to bottom */
 dialog.rvd{width:min(680px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
@@ -718,14 +720,17 @@ function today(){
   const t=ymd(new Date()),L=[...S.log,...LK].filter(e=>ymd(new Date(e.at))===t);
   const bad=S.bad.map(b=>{const st=streak([b.id]),u=L.filter(e=>e.b===b.id&&e.t!=='done');
     return `<div class="trow"><div><b>${esc(b.name)}</b><div class="dim">${span(st.cur)} clean · ${u.filter(e=>e.t==='resist').length} beaten today</div></div><button class="pri" data-a="urge" data-v="${b.id}">Urge</button></div>`}).join('');
-  const good=S.good.map(g=>{const D=L.filter(e=>isDone(e)&&e.g===g.name).sort((a,b)=>a.at-b.at),n=D.length,tg=g.target||1;
+  const cnt=g=>L.filter(e=>isDone(e)&&e.g===g.name).length,left=S.good.filter(g=>cnt(g)<(g.target||1)),fin=S.good.filter(g=>cnt(g)>=(g.target||1));
+  const good=left.map(g=>{const D=L.filter(e=>isDone(e)&&e.g===g.name).sort((a,b)=>a.at-b.at),n=D.length,tg=g.target||1;
     const dl=D.slice(-3).map(e=>`<div class="dd">✓ ${new Date(e.at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}${doneDet(e)?' · '+esc(doneDet(e)):''}${e.note?` <span class="dim">— ${esc(e.note.length>48?e.note.slice(0,47)+'…':e.note)}</span>`:''}</div>`).join('');
     const lk=LINKS[g.link],none=lk&&!appRows(lk.app);
     return `<div class="trow"><div><b class="${n>=tg?'pos':''}">${esc(g.name)}</b><div class="dim">${n} / ${tg} today${n>=tg?' ✓':''}${lk?` · via ${AN(lk.app)}${none?' (no data here yet)':''}`:''}</div>${dl}</div>
      <span class="tb">${doneBtn(g)}</span></div>`}).join('');
-  // under Up next's danger-hour row (UI.upNext, the same card in every app): the habits, to log as you go
+  // under Up next's danger-hour row (UI.upNext, the same card in every app): the habits, to log as you go. The ones
+  // done today fold into a line at the end, so the list is what's left (the log and TODAY have the times)
+  const done=fin.length?`<p class="nxd"><span class="pos">✓</span> Done today: ${fin.map(g=>`<b>${esc(g.name)}</b>`).join(' · ')}</p>`:'';
   return `<div class="nxh"><div class="sec first">Breaking</div>${bad||'<p class="dim">No habit to break yet_</p>'}
-   <div class="sec">Building</div>${good||'<p class="dim">No good habits yet_</p>'}
+   <div class="sec">Building</div>${S.good.length?good+(left.length?'':`<p class="dim">All ${S.good.length} good habits done today.</p>`)+done:'<p class="dim">No good habits yet_</p>'}
    <div class="calf"><span class="dim">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}</span><button data-a="habits">Edit habits</button></div></div>`;
 }
 
@@ -1405,7 +1410,7 @@ function planRows(){
   const top=Object.entries(C).sort((a,b)=>b[1]-a[1]),art=top.length&&window.UBM?UBM.art([top[0][0]],top.slice(1).filter(([,n])=>n>=B.length*.1).map(([k])=>k)):undefined;
   // here: what the button does in REWIRE's own Up next card (UI.upNext), where TODAY's 'plan' would only lead to it:
   // log the swap (its own words: + Done, or Log in the app it's saved in), or pick one
-  const here=X=>{const g=X.sw&&S.good.find(x=>x.name===X.sw.g),lk=g&&LINKS[g.link];return g?{act:'swap',btn:lk&&!quickLog(g.link)?'Log in '+AN(lk.app):'+ Done'}:{act:'habits',btn:'Pick one'}};
+  const here=X=>{if(X.done)return {act:''};const g=X.sw&&S.good.find(x=>x.name===X.sw.g),lk=g&&LINKS[g.link];return g?{act:'swap',btn:lk&&!quickLog(g.link)?'Log in '+AN(lk.app):'+ Done'}:{act:'habits',btn:'Pick one'}};
   const row=(X,k,act,w)=>({...(X.sw?{title,sub:cut(`${k}: ${X.sw.g} instead of ${bn}`,64),act,...w,...(X.done?{done:true}:{})}:{title:'Pick a swap',sub:cut(`Choose a good habit to replace ${bn}`,64),act:'swap',...w}),here:here(X),art});
   if(!P.sw&&!Q.sw)return [row(P)];
   if(P.h==null)return [{title:cut('Swap ready: '+P.sw.g,28),sub:cut(`For ${bn} · log urges to find your danger hour`,64),act:'plan',...(P.done?{done:true}:{}),here:here(P),art}];
@@ -1425,7 +1430,7 @@ if(R)draw();
 // 'today' (from TODAY's rings and timeline): drop any card filters and show just today, as a chip you can clear.
 // 'plan' (TODAY's plan card): show the danger-hour plan. An urge in progress comes first: it shows again instead
 // (left as it is when it's already open, so what you've typed stays).
-function doAct(a){if(!/^\w+$/.test(a||''))return;if(R&&a!=='today'){if(!dlg.open)draw();return}if(a==='plan')return showPlan();if(a==='swap'&&!document.querySelector('[data-act="swap"]')){const P=dangerPlan([...S.log,...linked()]),b=P.sw&&[...document.querySelectorAll('[data-a="done"]')].find(x=>x.dataset.v===P.sw.g);return (b||document.querySelector('[data-a="habits"]'))?.click()}if(a==='today'){U.x={};U.range=ymd(new Date());setMonth(Date.now());U.page=0;render();return}const b=document.querySelector(`[data-a="${a}"],[data-act="${a}"]`);if(b)b.click()}
+function doAct(a){if(!/^\w+$/.test(a||''))return;if(R&&a!=='today'){if(!dlg.open)draw();return}if(a==='plan')return showPlan();if(a==='swap'&&!document.querySelector('[data-act="swap"]')){const P=dangerPlan([...S.log,...linked()]),b=P.sw&&[...document.querySelectorAll('[data-a="done"]')].find(x=>x.dataset.v===P.sw.g);if(!b&&P.sw)return ACT.done(P.sw.g);return (b||document.querySelector('[data-a="habits"]'))?.click()}if(a==='today'){U.x={};U.range=ymd(new Date());setMonth(Date.now());U.page=0;render();return}const b=document.querySelector(`[data-a="${a}"],[data-act="${a}"]`);if(b)b.click()}
 addEventListener('message',e=>{if(e.origin===location.origin&&e.data&&e.data.isx==='do')doAct(e.data.act)});
 {const m=/do=(\w+)/.exec(location.hash);if(m){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>doAct(m[1]),0)}}
 /* ---------- today at a glance (shared hero, timeline and motion from ui.js) ---------- */
