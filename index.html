@@ -696,14 +696,14 @@ const kv=(k,v)=>`<div><span class="k">${k}</span><b>${v}</b></div>`;
 function calendar(){
   const D={};view(false).forEach(e=>{const d=D[e.day]??={r:0,s:0,g:0};if(e.t==='resist')d.r++;if(e.t==='slip')d.s++;if(isDone(e))d.g++});
   const {y,m}=U.month,lead=(new Date(y,m,1).getDay()+6)%7,dim=new Date(y,m+1,0).getDate(),rows=Math.ceil((lead+dim)/7),today=ymd(new Date());
-  let h='',cl=0,sl=0;
+  let h='',cl=0,sl=0,mr=0,mg=0;
   for(let r=0;r<rows;r++){
     let wr=0,ws=0,wg=0;
     for(let c=0;c<7;c++){
       const d=r*7+c-lead+1;
       if(d<1||d>dim){h+='<div class="cd off"></div>';continue}
       const k=`${y}-${pad(m+1)}-${pad(d)}`,x=D[k];
-      if(x){wr+=x.r;ws+=x.s;wg+=x.g;if(x.s)sl++;else cl++}
+      if(x){wr+=x.r;ws+=x.s;wg+=x.g;mr+=x.r;mg+=x.g;if(x.s)sl++;else cl++}
       h+=`<button class="cd${c<5?'':' we'}${x?x.s?' n':' p':''}${k===U.range?' sel':''}${k===today?' now':''}" data-a="day" data-v="${k}"><span>${d}${S.notes[k]?' <i class="amb">*</i>':''}</span>${x?`<b class="${x.s?'neg':'pos'}">${x.s?x.s+' slip'+(x.s>1?'s':''):'clean'}</b><em>${x.r} beat · ${x.g} good</em>`:''}</button>`;
     }
     h+=`<div class="cd wk">${wr+ws+wg?`<b class="${ws?'neg':'pos'}">${ws?ws+' slip'+(ws>1?'s':''):'clean'}</b><em>${wr} beat</em>`:'<em>—</em>'}</div>`;
@@ -713,7 +713,7 @@ function calendar(){
    <div>Clean: <b class="pos">${cl}</b> &nbsp; Slip: <b class="neg">${sl}</b></div></div>
   <div class="cal">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun','Week'].map(d=>`<div class="dw">${d}</div>`).join('')}${h}</div>
   <div class="calf"><div><button data-a="prev" aria-label="Previous month">&lt;</button> <b>${new Date(y,m,1).toLocaleDateString('en-US',{month:'long',year:'numeric'})}</b> <button data-a="next" aria-label="Next month">&gt;</button> <button data-a="tod">Today</button></div>
-   <span class="dim">Tap a day to filter · * = note</span></div></div>`;
+   <span class="dim">${cl} clean day${cl===1?'':'s'} · ${mr} urge${mr===1?'':'s'} beaten · ${mg} good habit${mg===1?'':'s'}</span></div></div>`;
 }
 
 function today(){
