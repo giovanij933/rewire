@@ -757,12 +757,13 @@ function table(T){
   U.page=Math.min(Math.max(U.page,0),pages-1);
   const what=e=>e.t==='done'?`<b class="pos">Good</b>${e.src?` <span class="dim">· ${AN(e.src)}</span>`:''}`:e.t==='slip'?`<b class="neg">Slip</b>`:`<b class="pos">Beat urge</b>`;
   const body=rows.slice(U.page*PAGE,(U.page+1)*PAGE).map(e=>`<tr>
-   <td>${tfmt(e.at)}</td><td>${what(e)}</td><td>${e.b?esc(badOf(e.b)?.name||'—'):na}</td><td>${e.g?esc(e.g):na}${e.t==='done'&&doneDet(e)?`<div class="dim sm">${esc(doneDet(e))}</div>`:''}</td>
+   <td>${tfmt(e.at)}</td><td class="lk">${what(e)}</td><td class="lm lh"><b>${esc(e.t==='done'?e.g||'Good habit':badOf(e.b)?.name||'Urge')}</b></td><td>${e.b?esc(badOf(e.b)?.name||'—'):na}</td><td>${e.g?esc(e.g):na}${e.t==='done'&&doneDet(e)?`<div class="dim sm">${esc(doneDet(e))}</div>`:''}</td>
    <td class="r">${e.int??na}</td><td class="dim">${esc(e.trig)||'—'}${e.body?.length&&window.UBM?`<div class="sm">felt in ${esc(UBM.words(e.body))}</div>`:''}</td>
    <td class="dim" title="${esc(e.note)}">${esc((e.note||'').length>40?e.note.slice(0,39)+'…':e.note||'')}</td>
-   <td class="r">${e.ro?`<a class="btn sm" href="${appUrl(e.src)}" target="_blank" rel="noopener" data-app="${e.src}">${e.src}</a>`:`<button data-a="edit" data-v="${e.id}">Edit</button> <button data-a="del" data-v="${e.id}" aria-label="Delete entry">X</button>`}</td></tr>`).join('');
+   <td class="lp">${esc([tfmt(e.at),e.int!=null&&'urge '+e.int+'/10',e.trig,e.body?.length&&window.UBM&&'felt in '+UBM.words(e.body),e.t==='done'&&doneDet(e)].filter(Boolean).join(' · '))}</td>
+   <td class="r la">${e.ro?`<a class="btn sm" href="${appUrl(e.src)}" target="_blank" rel="noopener" data-app="${e.src}">${e.src}</a>`:`<button data-a="edit" data-v="${e.id}">Edit</button> <button data-a="del" data-v="${e.id}" aria-label="Delete entry">X</button>`}</td></tr>`).join('');
   return `<div class="card"><div class="rowh"><p class="h">Log</p><button data-a="csv">Export CSV</button></div>
-  <div class="tw" tabindex="0" role="region" aria-label="Table"><table><thead><tr><th>${F.th(0)}</th><th>${F.th(1)}</th><th>${F.th(2)}</th><th>${F.th(3)}</th><th class="r">${F.th(4)}</th><th>${F.th(5)}</th><th>${F.th(6)}</th><th><span class="ui-sr">Actions</span></th></tr></thead>
+  <div class="tw" tabindex="0" role="region" aria-label="Table"><table class="ui-lg"><thead><tr><th>${F.th(0)}</th><th>${F.th(1)}</th><th>${F.th(2)}</th><th>${F.th(3)}</th><th class="r">${F.th(4)}</th><th>${F.th(5)}</th><th>${F.th(6)}</th><th><span class="ui-sr">Actions</span></th></tr></thead>
   <tbody>${body||'<tr><td colspan="8" class="dim">Nothing in this view_</td></tr>'}</tbody></table></div>
   <div class="calf"><div><button data-a="pp">&lt;</button> Page <b>${U.page+1}</b> of ${pages} <button data-a="pn">&gt;</button></div><span class="dim">${rows.length} record${rows.length===1?'':'s'}${F.clear()}</span></div></div>`;
 }
