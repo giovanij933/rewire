@@ -463,7 +463,7 @@ const GOOD=['Drink water','Walk 10 min','20 push-ups','Read 5 pages','Meditate 5
 const SURF=['Notice where the urge sits in your body. Just notice it.','Name it: this is an urge. It is not an order.',
   'Breathe slowly. Let the wave rise. You don\'t have to act on it.','Watch it change. Stronger, weaker, shifting.',
   'Remember why: {why}','It is already passing. Stay with the breath.','Next: do {rep}.'];
-const CALM=[['INHALE',4],['EXHALE',6]];
+const CALM=[['Inhale',4],['Exhale',6]];
 
 const $=s=>document.querySelector(s), dlg=$('#dlg');
 // session screens (start, live, done) open as a full-screen sheet; other dialogs keep the usual box
@@ -945,7 +945,7 @@ async function wake(on){try{if(on&&!WL){WL=await navigator.wakeLock?.request('sc
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&R&&!R.end)wake(true)});
 function breath(ms){
   let x=ms/1000%CALM.reduce((a,p)=>a+p[1],0),s=.45;
-  for(const[c,d]of CALM){const to=c==='INHALE'?1:.45;if(x<d)return {c,left:Math.ceil(d-x),s:s+(to-s)*(1-Math.cos(Math.PI*x/d))/2};x-=d;s=to}
+  for(const[c,d]of CALM){const to=c==='Inhale'?1:.45;if(x<d)return {c,left:Math.ceil(d-x),s:s+(to-s)*(1-Math.cos(Math.PI*x/d))/2};x-=d;s=to}
   return {c:'',left:0,s};
 }
 function clearRun(){waveOff();window.UI?.runBar?.(null);clearInterval(RI);cancelAnimationFrame(RA);RI=0;R=null;try{localStorage.removeItem(RUN)}catch(e){}window.UI?.replan?.();wake(false)}
