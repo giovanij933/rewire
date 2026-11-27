@@ -1286,7 +1286,7 @@ function review(day){
   out+=sec('What went well',good.length?li(good):'<p>Nothing stands out in the numbers. Some days are about getting through, and that counts.</p>');
   out+=sec('What to look at',look.length?li(look):'<p>No warning signs in the numbers.</p>');
   // the morning check-in from TODAY, when there is one for this date
-  let ci=null;try{ci=(JSON.parse(localStorage.getItem('isx.checkin.v1'))?.log||[]).find(e=>e.day===day)}catch(e){}
+  let ci=UI.checkins().log.find(e=>e.day===day)||null;   // through UI.checkins: typed fields, never stored text as it is
   if(ci){const Q=['','poor','restless','OK','good','great'],E=['','drained','low','steady','good','charged'],sh=ci.sleep!=null&&ci.sleep<7;
     out+=sec('My state',`<p>${ci.sleep!=null?`I slept <b>${ci.sleep} h</b> (${Q[ci.q]||'unrated'} sleep) and my`:'My'} energy was <b>${E[ci.energy]||'unrated'}</b>.`+
       (sh&&(more||L.length)?` Short sleep and ${L.length?'a slip':'more urges than usual'}: tired brains crave the old loop. Worth watching if it repeats.`
