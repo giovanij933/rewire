@@ -495,6 +495,12 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
    log:  {id,at,t:'resist'|'slip'|'done',b(bad id),g(good name),int(1-10),trig,note} — a resisted urge may carry the swap it led to;
          a surfed urge, where it was felt (body: ['chest', 'stomach', ...], the places in urgemap.js)
          (sg: the app's suggestion, left as it was; lk: a swap that counts from its own app) and the surf length (mins) */
+// Every other field is made what the app writes, because the pages put them into markup as they are: a restored file
+// or a synced copy with an id holding quotes, a goal or an urge level that's text, or a "via" app that isn't a word could
+// carry HTML into the page (and run a script there, which could read every app's data). Ids keep letters, digits, - and
+// _ (the same change on a habit and on its entries, so they still match); numbers are numbers or left out.
+const sid=v=>String(v??'').replace(/[^\w-]/g,'_').slice(0,64),num=(v,lo,hi)=>{v=typeof v==='string'&&v.trim()!==''?+v:v;return fin(v)&&v>=lo&&v<=hi?v:undefined};
+const strs=a=>arr(a).filter(x=>typeof x==='string');
 let S=load();
 const U={h:'all',range:'all',page:0,month:null,x:{}};   // x: cross-filters set by clicking a card (ev, dres, g, trig, band, hour)
 function load(){
@@ -504,9 +510,15 @@ function load(){
 // saved or restored data, checked so one bad value can't stop the app from starting: habits need an id and a name,
 // entries a time and a kind. lv stays, or a restore would move its good-habit ticks into the other apps again.
 function clean(s){
-  return {bad:arr(s.bad).filter(b=>b?.id&&typeof b.name==='string').map(b=>({...b,start:fin(b.start)?b.start:Date.now(),reps:arr(b.reps)})),
-    good:arr(s.good).filter(g=>typeof g?.name==='string'),log:s.log.filter(e=>fin(e?.at)&&['resist','slip','done'].includes(e.t)),
-    notes:s.notes&&typeof s.notes==='object'&&!Array.isArray(s.notes)?s.notes:{},lv:s.lv||0};
+  const bad=arr(s.bad).filter(b=>b?.id&&typeof b.name==='string').map(b=>({...b,id:sid(b.id),why:String(b.why??''),start:fin(b.start)?b.start:Date.now(),reps:strs(b.reps),
+    unit:b.unit==='min'?'min':'$',cost:num(b.cost,0,1e9)??'',goal:Math.round(num(b.goal,1,1e5)??30)}));
+  const good=arr(s.good).filter(g=>typeof g?.name==='string').map(g=>{const o={...g,target:Math.round(num(g.target,1,1e4)??1)};
+    if(o.link!=null&&!/^\w{1,32}$/.test(o.link))delete o.link;if(o.ex!=null)o.ex=String(o.ex);if(o.amt!=null&&(o.amt=num(o.amt,0,1e6))===undefined)delete o.amt;return o});
+  const log=s.log.filter(e=>fin(e?.at)&&['resist','slip','done'].includes(e.t)).map(e=>{const o={...e};
+    if(o.id!=null)o.id=sid(o.id);if(o.b!=null)o.b=sid(o.b);for(const k of ['g','trig','note','unit','det'])if(o[k]!=null)o[k]=String(o[k]);
+    for(const [k,lo,hi] of [['int',1,10],['mins',0,1440],['amt',0,1e6],['feel',1,10]])if(o[k]!=null){const v=num(o[k],lo,hi);if(v===undefined)delete o[k];else o[k]=v}
+    if(o.body!=null)o.body=strs(o.body);if(o.src!=null&&!/^\w{1,32}$/.test(o.src))delete o.src;return o});
+  return {bad,good,log,notes:s.notes&&typeof s.notes==='object'&&!Array.isArray(s.notes)?s.notes:{},lv:s.lv||0};
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Storage write failed — take a backup')}planReg()}
 function setMonth(ms){const d=new Date(ms);U.month={y:d.getFullYear(),m:d.getMonth()}}
