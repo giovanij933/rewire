@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="script-src 'self' 'sha256-vtbDO042/giDCdir93hkeyV4AKDZVdbSINpMjwkQBns=' 'sha256-rJLjxDNw2e7/IVTcON7MOnnv3PPjF8qCXTLbZIuyIb0='; object-src 'none'; base-uri 'self'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'self' 'sha256-vtbDO042/giDCdir93hkeyV4AKDZVdbSINpMjwkQBns=' 'sha256-2rLQ+XCEWNgmEp7i6jp9cnWVmEC7EmIjPAFlarCrfJs='; object-src 'none'; base-uri 'self'">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
@@ -1478,7 +1478,10 @@ if(R)draw();
 // 'plan' (TODAY's plan card): show the danger-hour plan. An urge in progress comes first: it shows again instead
 // (left as it is when it's already open, so what you've typed stays).
 function doAct(a){if(!/^\w+$/.test(a||''))return;if(R&&a!=='today'){if(!dlg.open)draw();return}if(a==='plan')return showPlan();if(a==='swap'&&!document.querySelector('[data-act="swap"]')){const P=dangerPlan([...S.log,...linked()]),b=P.sw&&[...document.querySelectorAll('[data-a="done"]')].find(x=>x.dataset.v===P.sw.g);if(!b&&P.sw)return ACT.done(P.sw.g);return (b||document.querySelector('[data-a="habits"]'))?.click()}if(a==='today'){U.x={};U.range=ymd(new Date());setMonth(Date.now());U.page=0;render();return}const b=document.querySelector(`[data-a="${a}"],[data-act="${a}"]`);if(b)b.click()}
-addEventListener('message',e=>{if(e.origin===location.origin&&e.data&&e.data.isx==='do')doAct(e.data.act)});
+// TODAY's Settings › Sample data (ISIONXXX ARCHITECTURE.md 2w): TODAY has asked already, so the sample loads without asking
+// again, then this app says so (TODAY redraws once every app has)
+addEventListener('message',e=>{if(e.origin!==location.origin||!e.data)return;if(e.data.isx==='do')doAct(e.data.act);
+  else if(e.data.isx==='sample'){sample();e.source?.postMessage({isx:'sampled'},location.origin)}});
 {const m=/do=(\w+)/.exec(location.hash);if(m){history.replaceState(null,'',location.pathname+location.search);setTimeout(()=>doAct(m[1]),0)}}
 /* ---------- today at a glance (shared hero, timeline and motion from ui.js) ---------- */
 function heroToday(){
