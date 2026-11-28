@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="script-src 'self' 'sha256-vtbDO042/giDCdir93hkeyV4AKDZVdbSINpMjwkQBns=' 'sha256-R02VBX5RPxN+fVbKUqwoKBDWzydq0Ugo5xKPZd4lY+E='; object-src 'none'; base-uri 'self'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'self' 'sha256-vtbDO042/giDCdir93hkeyV4AKDZVdbSINpMjwkQBns=' 'sha256-rJLjxDNw2e7/IVTcON7MOnnv3PPjF8qCXTLbZIuyIb0='; object-src 'none'; base-uri 'self'">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
@@ -1444,7 +1444,8 @@ function linkAll(){
 let PK='';
 function planReg(){const src=[KEY,RUN,...new Set(S.good.map(g=>APPS[LINKS[g.link]?.app]?.key).filter(Boolean))];if(src.join()!==PK){PK=src.join();UI.planner('rewire',src,planRows)}else UI.replan()}
 function planRows(){
-  if(!S.bad.length)return [];
+  // nothing set up yet: the first step is naming the habit to break (the habits sheet), as the empty page asks
+  if(!S.bad.length)return [{title:'What do you want to break?',sub:'Name the habit, then the good habits that replace it',act:'habits'}];
   // an urge being surfed (or over and not logged yet) is TODAY's row, with the surf's clock: URGE brings it back
   if(R&&badOf(R.b))return [{title:`Surf · ${badOf(R.b).name}`,sub:R.end?'Over · not logged yet':'',act:'urge',run:R.end?{saved:false}:{t0:R.t0,mins:R.mins||0},art:R.body?.length&&window.UBM?UBM.art(R.body,[]):undefined}];
   const L=[...S.log,...linked()],P=dangerPlan(L),bn=badOf(P.b)?.name||'',cut=(s,n)=>s.length>n?s.slice(0,n-1)+'…':s;
